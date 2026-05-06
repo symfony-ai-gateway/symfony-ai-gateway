@@ -15,14 +15,16 @@ use PhiGateway\Provider\ProviderResponse;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
+use function sprintf;
+
 final class Gateway implements GatewayInterface
 {
     private LoggerInterface $logger;
 
     /**
      * @param array<string, ProviderAdapterInterface> $providers provider name → adapter
-     * @param array<string, list<string>> $pipelines pipeline name → ordered model aliases
-     * @param array<string, string> $aliases routing alias → model alias or "pipeline:name"
+     * @param array<string, list<string>>             $pipelines pipeline name → ordered model aliases
+     * @param array<string, string>                   $aliases   routing alias → model alias or "pipeline:name"
      */
     public function __construct(
         private readonly ModelRegistry $modelRegistry,
@@ -31,7 +33,7 @@ final class Gateway implements GatewayInterface
         private readonly array $pipelines = [],
         private readonly array $aliases = [],
         private readonly RetryConfig $defaultRetryConfig = new RetryConfig(),
-        ?LoggerInterface $logger = null,
+        LoggerInterface|null $logger = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -88,11 +90,8 @@ final class Gateway implements GatewayInterface
 
         if ($providerResponse->statusCode >= 400) {
             $error = $adapter->parseError($providerResponse->statusCode, $providerResponse->body);
-            throw GatewayException::providerError(
-                $adapter->getName(),
-                $providerResponse->statusCode,
-                $error->message,
-            );
+
+            throw GatewayException::providerError($adapter->getName(), $providerResponse->statusCode, $error->message);
         }
 
         return $adapter->translateResponse($providerResponse, $request->model);
@@ -101,7 +100,7 @@ final class Gateway implements GatewayInterface
     private function executePipeline(NormalizedRequest $request, string $pipelineName): NormalizedResponse
     {
         $models = $this->pipelines[$pipelineName]
-            ?? throw GatewayException::invalidRequest(\sprintf('Pipeline "%s" not found.', $pipelineName));
+            ?? throw GatewayException::invalidRequest(sprintf('Pipeline "%s" not found.', $pipelineName));
 
         $strategy = new FallbackStrategy(
             modelAliases: $models,

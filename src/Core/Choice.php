@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace PhiGateway\Core;
 
+use function is_array;
+
 /**
  * A single choice in an LLM response.
  */
 final readonly class Choice
 {
     /**
-     * @param int $index Position of this choice
-     * @param Message $message The assistant's response message
+     * @param int         $index        Position of this choice
+     * @param Message     $message      The assistant's response message
      * @param string|null $finishReason Why generation stopped: "stop", "length", "tool_calls", "content_filter"
      */
     public function __construct(
         public int $index,
         public Message $message,
-        public ?string $finishReason = null,
+        public string|null $finishReason = null,
     ) {
     }
 

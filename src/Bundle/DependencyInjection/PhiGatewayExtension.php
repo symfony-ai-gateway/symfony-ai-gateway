@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PhiGateway\Bundle\DependencyInjection;
 
-use PhiGateway\Bundle\PhiGatewayBundle;
 use PhiGateway\Config\ModelRegistry;
 use PhiGateway\Core\Gateway;
 use PhiGateway\Core\GatewayInterface;
@@ -13,6 +12,9 @@ use PhiGateway\Pipeline\RetryConfig;
 use PhiGateway\Provider\Anthropic\AnthropicAdapter;
 use PhiGateway\Provider\OpenAI\OpenAIAdapter;
 use PhiGateway\Provider\ProviderAdapterInterface;
+
+use function sprintf;
+
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -21,6 +23,11 @@ use Symfony\Component\HttpKernel\DependencyInjection\ConfigurableExtension;
 
 final class PhiGatewayExtension extends ConfigurableExtension
 {
+    public function getAlias(): string
+    {
+        return 'phi_gateway';
+    }
+
     /**
      * @param array<string, mixed> $mergedConfig
      */
@@ -47,10 +54,8 @@ final class PhiGatewayExtension extends ConfigurableExtension
     {
         $models = $config['models'] ?? [];
 
-        if ($models === []) {
-            throw new InvalidConfigurationException(
-                'At least one model must be configured under "phi_gateway.models".',
-            );
+        if ([] === $models) {
+            throw new InvalidConfigurationException('At least one model must be configured under "phi_gateway.models".');
         }
 
         $registryDefinition = $container
@@ -83,14 +88,12 @@ final class PhiGatewayExtension extends ConfigurableExtension
     {
         $providers = $config['providers'] ?? [];
 
-        if ($providers === []) {
-            throw new InvalidConfigurationException(
-                'At least one provider must be configured under "phi_gateway.providers".',
-            );
+        if ([] === $providers) {
+            throw new InvalidConfigurationException('At least one provider must be configured under "phi_gateway.providers".');
         }
 
         foreach ($providers as $name => $providerConfig) {
-            $adapterServiceId = \sprintf('phi_gateway.provider.%s', $name);
+            $adapterServiceId = sprintf('phi_gateway.provider.%s', $name);
 
             match ($name) {
                 'openai' => $container->register($adapterServiceId, OpenAIAdapter::class)
@@ -166,9 +169,7 @@ final class PhiGatewayExtension extends ConfigurableExtension
 
         foreach ($container->findTaggedServiceIds('phi_gateway.provider') as $id => $tags) {
             foreach ($tags as $tag) {
-                $providerName = $tag['provider'] ?? throw new InvalidConfigurationException(
-                    \sprintf('Service "%s" tagged "phi_gateway.provider" must have a "provider" attribute.', $id),
-                );
+                $providerName = $tag['provider'] ?? throw new InvalidConfigurationException(sprintf('Service "%s" tagged "phi_gateway.provider" must have a "provider" attribute.', $id));
                 $providerServices[$providerName] = new Reference($id);
             }
         }
@@ -186,10 +187,5 @@ final class PhiGatewayExtension extends ConfigurableExtension
             ]);
 
         $container->setAlias(GatewayInterface::class, Gateway::class);
-    }
-
-    public function getAlias(): string
-    {
-        return 'phi_gateway';
     }
 }

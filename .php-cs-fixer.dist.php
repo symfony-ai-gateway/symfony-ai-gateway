@@ -8,7 +8,7 @@ return (new PhpCsFixer\Config())
         '@PHP82Migration:risky' => true,
         '@Symfony' => true,
         '@Symfony:risky' => true,
-        'array_syntax' => ['syntax' => 'short_syntax'],
+        'array_syntax' => ['syntax' => 'short'],
         'declare_strict_types' => true,
         'ordered_imports' => true,
         'ordered_class_elements' => true,
@@ -21,7 +21,7 @@ return (new PhpCsFixer\Config())
         'no_superfluous_phpdoc_tags' => true,
         'fully_qualified_strict_types' => true,
         'global_namespace_import' => ['import_classes' => true, 'import_constants' => true, 'import_functions' => true],
-        'nullable_type_declaration' => ['syntax' => 'union_syntax'],
+        'nullable_type_declaration' => ['syntax' => 'union'],
     ])
     ->setRiskyAllowed(true)
     ->setFinder(

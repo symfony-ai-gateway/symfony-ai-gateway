@@ -8,6 +8,10 @@ use PhiGateway\Provider\ProviderRequest;
 use PhiGateway\Provider\ProviderResponse;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+
+use function sprintf;
+use function strlen;
+
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final class ProviderHttpClient
@@ -16,14 +20,14 @@ final class ProviderHttpClient
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
-        ?LoggerInterface $logger = null,
+        LoggerInterface|null $logger = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
 
     public function send(ProviderRequest $request): ProviderResponse
     {
-        $this->logger->debug(\sprintf(
+        $this->logger->debug(sprintf(
             '[PhiGateway] HTTP %s %s',
             $request->method,
             $request->url,
@@ -44,10 +48,10 @@ final class ProviderHttpClient
 
         $body = $response->getContent(false);
 
-        $this->logger->debug(\sprintf(
+        $this->logger->debug(sprintf(
             '[PhiGateway] Response HTTP %d (%d bytes)',
             $statusCode,
-            \strlen($body),
+            strlen($body),
         ));
 
         return new ProviderResponse(

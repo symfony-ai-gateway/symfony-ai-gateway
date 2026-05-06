@@ -10,18 +10,18 @@ namespace PhiGateway\Core;
 final readonly class Message
 {
     /**
-     * @param string $role One of: system, user, assistant, tool
-     * @param string $content The text content of the message
-     * @param string|null $name Optional sender name (for tool messages)
-     * @param list<array<string, mixed>>|null $toolCalls Tool calls made by the assistant
-     * @param string|null $toolCallId The tool call ID this message responds to
+     * @param string                          $role       One of: system, user, assistant, tool
+     * @param string                          $content    The text content of the message
+     * @param string|null                     $name       Optional sender name (for tool messages)
+     * @param list<array<string, mixed>>|null $toolCalls  Tool calls made by the assistant
+     * @param string|null                     $toolCallId The tool call ID this message responds to
      */
     public function __construct(
         public string $role,
         public string $content,
-        public ?string $name = null,
-        public ?array $toolCalls = null,
-        public ?string $toolCallId = null,
+        public string|null $name = null,
+        public array|null $toolCalls = null,
+        public string|null $toolCallId = null,
     ) {
     }
 
@@ -50,21 +50,21 @@ final readonly class Message
     {
         $result = ['role' => $this->role];
 
-        if ($this->content !== '') {
+        if ('' !== $this->content) {
             $result['content'] = $this->content;
         } else {
             $result['content'] = null;
         }
 
-        if ($this->name !== null) {
+        if (null !== $this->name) {
             $result['name'] = $this->name;
         }
 
-        if ($this->toolCalls !== null) {
+        if (null !== $this->toolCalls) {
             $result['tool_calls'] = $this->toolCalls;
         }
 
-        if ($this->toolCallId !== null) {
+        if (null !== $this->toolCallId) {
             $result['tool_call_id'] = $this->toolCallId;
         }
 

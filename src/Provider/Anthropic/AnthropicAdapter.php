@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace PhiGateway\Provider\Anthropic;
 
+use function in_array;
+
+use const JSON_THROW_ON_ERROR;
+
+use JsonException;
 use PhiGateway\Core\Choice;
 use PhiGateway\Core\Message;
 use PhiGateway\Core\NormalizedRequest;
@@ -14,6 +19,10 @@ use PhiGateway\Provider\ProviderCapabilities;
 use PhiGateway\Provider\ProviderError;
 use PhiGateway\Provider\ProviderRequest;
 use PhiGateway\Provider\ProviderResponse;
+
+use function sprintf;
+
+use stdClass;
 
 final class AnthropicAdapter implements ProviderAdapterInterface
 {
@@ -44,7 +53,7 @@ final class AnthropicAdapter implements ProviderAdapterInterface
         $body = $this->buildRequestBody($request);
 
         return new ProviderRequest(
-            url: \sprintf('%s/messages', rtrim($this->baseUrl, '/')),
+            url: sprintf('%s/messages', rtrim($this->baseUrl, '/')),
             method: 'POST',
             headers: $headers,
             body: json_encode($body, JSON_THROW_ON_ERROR),
@@ -66,7 +75,7 @@ final class AnthropicAdapter implements ProviderAdapterInterface
         $message = new Message(
             role: 'assistant',
             content: $text,
-            toolCalls: $toolCalls !== [] ? $toolCalls : null,
+            toolCalls: [] !== $toolCalls ? $toolCalls : null,
         );
 
         $finishReason = $this->mapFinishReason($data['stop_reason'] ?? null);
@@ -80,7 +89,7 @@ final class AnthropicAdapter implements ProviderAdapterInterface
         );
 
         return new NormalizedResponse(
-            id: $data['id'] ?? \sprintf('msg_%s', bin2hex(random_bytes(12))),
+            id: $data['id'] ?? sprintf('msg_%s', bin2hex(random_bytes(12))),
             model: $data['model'] ?? $requestedModel,
             provider: $this->getName(),
             choices: [$choice],
@@ -92,7 +101,7 @@ final class AnthropicAdapter implements ProviderAdapterInterface
 
     public function isRetryableError(int $statusCode, string $body): bool
     {
-        return \in_array($statusCode, [429, 500, 502, 503, 529], true);
+        return in_array($statusCode, [429, 500, 502, 503, 529], true);
     }
 
     public function parseError(int $statusCode, string $body): ProviderError
@@ -109,10 +118,10 @@ final class AnthropicAdapter implements ProviderAdapterInterface
                 type: 'anthropic_error',
                 retryable: $retryable,
             );
-        } catch (\JsonException) {
+        } catch (JsonException) {
             return new ProviderError(
                 code: (string) $statusCode,
-                message: \sprintf('Anthropic returned HTTP %d with non-JSON body', $statusCode),
+                message: sprintf('Anthropic returned HTTP %d with non-JSON body', $statusCode),
                 type: 'http_error',
                 retryable: $retryable,
             );
@@ -148,7 +157,7 @@ final class AnthropicAdapter implements ProviderAdapterInterface
         $messages = [];
 
         foreach ($request->messages as $message) {
-            if ($message->role === 'system') {
+            if ('system' === $message->role) {
                 $systemMessage = $message->content;
 
                 continue;
@@ -163,19 +172,19 @@ final class AnthropicAdapter implements ProviderAdapterInterface
             'max_tokens' => $request->maxTokens ?? self::DEFAULT_MAX_TOKENS,
         ];
 
-        if ($systemMessage !== null) {
+        if (null !== $systemMessage) {
             $body['system'] = $systemMessage;
         }
 
-        if ($request->temperature !== 1.0) {
+        if (1.0 !== $request->temperature) {
             $body['temperature'] = $request->temperature;
         }
 
-        if ($request->topP !== null) {
+        if (null !== $request->topP) {
             $body['top_p'] = $request->topP;
         }
 
-        if ($request->stop !== null) {
+        if (null !== $request->stop) {
             $body['stop_sequences'] = $request->stop;
         }
 
@@ -183,11 +192,11 @@ final class AnthropicAdapter implements ProviderAdapterInterface
             $body['stream'] = true;
         }
 
-        if ($request->tools !== null) {
+        if (null !== $request->tools) {
             $body['tools'] = $this->convertTools($request->tools);
         }
 
-        if ($request->seed !== null) {
+        if (null !== $request->seed) {
             $body['metadata'] = ['user_id' => (string) $request->seed];
         }
 
@@ -197,10 +206,10 @@ final class AnthropicAdapter implements ProviderAdapterInterface
     /** @return array{role: string, content: string|array<int, array<string, mixed>>} */
     private function convertMessage(Message $message): array
     {
-        if ($message->role === 'assistant' && $message->toolCalls !== null) {
+        if ('assistant' === $message->role && null !== $message->toolCalls) {
             $content = [];
 
-            if ($message->content !== '') {
+            if ('' !== $message->content) {
                 $content[] = ['type' => 'text', 'text' => $message->content];
             }
 
@@ -216,7 +225,7 @@ final class AnthropicAdapter implements ProviderAdapterInterface
             return ['role' => 'assistant', 'content' => $content];
         }
 
-        if ($message->role === 'tool') {
+        if ('tool' === $message->role) {
             return [
                 'role' => 'user',
                 'content' => [
@@ -234,6 +243,7 @@ final class AnthropicAdapter implements ProviderAdapterInterface
 
     /**
      * @param list<array<string, mixed>> $openaiTools
+     *
      * @return list<array{name: string, description?: string, input_schema: array<string, mixed>}>
      */
     private function convertTools(array $openaiTools): array
@@ -258,6 +268,7 @@ final class AnthropicAdapter implements ProviderAdapterInterface
 
     /**
      * @param list<array<string, mixed>> $toolUseBlocks
+     *
      * @return list<array<string, mixed>>
      */
     private function convertToolUseBlocks(array $toolUseBlocks): array
@@ -269,7 +280,7 @@ final class AnthropicAdapter implements ProviderAdapterInterface
                 'type' => 'function',
                 'function' => [
                     'name' => $block['name'] ?? '',
-                    'arguments' => json_encode($block['input'] ?? new \stdClass(), JSON_THROW_ON_ERROR),
+                    'arguments' => json_encode($block['input'] ?? new stdClass(), JSON_THROW_ON_ERROR),
                 ],
             ];
         }
@@ -277,7 +288,7 @@ final class AnthropicAdapter implements ProviderAdapterInterface
         return $result;
     }
 
-    private function mapFinishReason(?string $stopReason): ?string
+    private function mapFinishReason(string|null $stopReason): string|null
     {
         return match ($stopReason) {
             'end_turn' => 'stop',

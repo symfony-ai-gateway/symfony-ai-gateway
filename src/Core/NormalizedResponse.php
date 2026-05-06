@@ -11,7 +11,6 @@ final readonly class NormalizedResponse
 {
     /**
      * @param list<Choice> $choices
-     * @param string|null $systemFingerprint
      */
     public function __construct(
         public string $id,
@@ -20,8 +19,8 @@ final readonly class NormalizedResponse
         public array $choices,
         public Usage $usage,
         public int $statusCode = 200,
-        public ?string $systemFingerprint = null,
-        public ?string $fallbackFrom = null,
+        public string|null $systemFingerprint = null,
+        public string|null $fallbackFrom = null,
         public float $durationMs = 0.0,
         public bool $cacheHit = false,
         public float $costUsd = 0.0,

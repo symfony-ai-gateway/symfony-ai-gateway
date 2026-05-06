@@ -10,9 +10,9 @@ namespace PhiGateway\Provider;
 final readonly class ProviderResponse
 {
     /**
-     * @param int $statusCode HTTP status code
-     * @param array<string, string> $headers Response headers
-     * @param string $body Raw response body
+     * @param int                   $statusCode HTTP status code
+     * @param array<string, string> $headers    Response headers
+     * @param string                $body       Raw response body
      */
     public function __construct(
         public int $statusCode,

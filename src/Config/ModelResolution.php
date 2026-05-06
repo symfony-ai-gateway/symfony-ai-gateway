@@ -17,7 +17,7 @@ final readonly class ModelResolution
         public string $model,
         public ModelPricing $pricing,
         public int $maxTokens = 128000,
-        public ?ProviderCapabilities $capabilities = null,
+        public ProviderCapabilities|null $capabilities = null,
     ) {
     }
 }

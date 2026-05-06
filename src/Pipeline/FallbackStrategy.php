@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhiGateway\Pipeline;
 
+use function in_array;
+
 use PhiGateway\Core\NormalizedRequest;
 use PhiGateway\Core\NormalizedResponse;
 use PhiGateway\Exception\GatewayException;
@@ -12,22 +14,24 @@ use PhiGateway\Provider\ProviderRequest;
 use PhiGateway\Provider\ProviderResponse;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
+use RuntimeException;
+
+use function sprintf;
 
 final class FallbackStrategy
 {
     private LoggerInterface $logger;
 
     /**
-     * @param list<string> $modelAliases Ordered list of models to try
-     * @param RetryConfig $retryConfig Retry configuration per model
-     * @param list<int> $failFastErrors HTTP status codes that should NOT trigger fallback
+     * @param list<string> $modelAliases   Ordered list of models to try
+     * @param RetryConfig  $retryConfig    Retry configuration per model
+     * @param list<int>    $failFastErrors HTTP status codes that should NOT trigger fallback
      */
     public function __construct(
         private readonly array $modelAliases,
         private readonly RetryConfig $retryConfig = new RetryConfig(),
         private readonly array $failFastErrors = [400, 401, 403],
-        ?LoggerInterface $logger = null,
+        LoggerInterface|null $logger = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -36,7 +40,7 @@ final class FallbackStrategy
      * Execute the fallback pipeline.
      *
      * @param callable(string $modelAlias): ProviderAdapterInterface $adapterResolver
-     * @param callable(ProviderRequest $request): ProviderResponse $httpCaller
+     * @param callable(ProviderRequest $request): ProviderResponse   $httpCaller
      */
     public function execute(
         NormalizedRequest $request,
@@ -52,8 +56,8 @@ final class FallbackStrategy
                 $this->withModel($request, $modelAlias),
             );
 
-            for ($attempt = 0; $attempt <= $this->retryConfig->maxAttempts; $attempt++) {
-                $this->logger->info(\sprintf(
+            for ($attempt = 0; $attempt <= $this->retryConfig->maxAttempts; ++$attempt) {
+                $this->logger->info(sprintf(
                     '[PhiGateway] Trying model=%s provider=%s attempt=%d/%d',
                     $modelAlias,
                     $adapter->getName(),
@@ -65,19 +69,15 @@ final class FallbackStrategy
                     $providerResponse = $httpCaller($providerRequest);
 
                     if ($providerResponse->statusCode >= 400) {
-                        if (\in_array($providerResponse->statusCode, $this->failFastErrors, true)) {
+                        if (in_array($providerResponse->statusCode, $this->failFastErrors, true)) {
                             $error = $adapter->parseError($providerResponse->statusCode, $providerResponse->body);
-                            $this->logger->error(\sprintf(
+                            $this->logger->error(sprintf(
                                 '[PhiGateway] Non-retryable error from %s: %s',
                                 $adapter->getName(),
                                 $error->message,
                             ));
 
-                            throw GatewayException::providerError(
-                                $adapter->getName(),
-                                $providerResponse->statusCode,
-                                $error->message,
-                            );
+                            throw GatewayException::providerError($adapter->getName(), $providerResponse->statusCode, $error->message);
                         }
 
                         if (!$adapter->isRetryableError($providerResponse->statusCode, $providerResponse->body)) {
@@ -85,7 +85,7 @@ final class FallbackStrategy
                         }
 
                         $lastError = $adapter->parseError($providerResponse->statusCode, $providerResponse->body);
-                        $this->logger->warning(\sprintf(
+                        $this->logger->warning(sprintf(
                             '[PhiGateway] Retryable error from %s (HTTP %d), attempt %d/%d',
                             $adapter->getName(),
                             $providerResponse->statusCode,
@@ -102,8 +102,8 @@ final class FallbackStrategy
 
                     $response = $adapter->translateResponse($providerResponse, $request->model);
 
-                    if ($attemptedModels !== []) {
-                        $this->logger->info(\sprintf(
+                    if ([] !== $attemptedModels) {
+                        $this->logger->info(sprintf(
                             '[PhiGateway] Fallback succeeded: %s (fallback from %s)',
                             $modelAlias,
                             implode(', ', $attemptedModels),
@@ -112,11 +112,11 @@ final class FallbackStrategy
 
                     return $response;
                 } catch (GatewayException $e) {
-                    if (\in_array($e->getCode(), $this->failFastErrors, true)) {
+                    if (in_array($e->getCode(), $this->failFastErrors, true)) {
                         throw $e;
                     }
 
-                    $lastError = new \RuntimeException($e->getMessage(), (int) $e->getCode(), $e);
+                    $lastError = new RuntimeException($e->getMessage(), (int) $e->getCode(), $e);
                 }
             }
 

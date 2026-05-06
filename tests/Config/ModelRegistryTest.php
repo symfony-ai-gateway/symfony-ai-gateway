@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace PhiGateway\Tests\Config;
 
-use PHPUnit\Framework\TestCase;
 use PhiGateway\Config\ModelRegistry;
 use PhiGateway\Exception\GatewayException;
+use PHPUnit\Framework\TestCase;
 
 final class ModelRegistryTest extends TestCase
 {

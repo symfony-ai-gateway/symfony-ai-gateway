@@ -10,11 +10,11 @@ namespace PhiGateway\Provider;
 final readonly class ProviderRequest
 {
     /**
-     * @param string $url Full URL to call
-     * @param string $method HTTP method (GET, POST)
-     * @param array<string, string> $headers HTTP headers (auth, content-type, etc.)
-     * @param string $body JSON-encoded request body
-     * @param int $timeoutSeconds Request timeout
+     * @param string                $url            Full URL to call
+     * @param string                $method         HTTP method (GET, POST)
+     * @param array<string, string> $headers        HTTP headers (auth, content-type, etc.)
+     * @param string                $body           JSON-encoded request body
+     * @param int                   $timeoutSeconds Request timeout
      */
     public function __construct(
         public string $url,

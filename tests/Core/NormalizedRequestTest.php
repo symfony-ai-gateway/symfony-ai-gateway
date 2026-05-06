@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace PhiGateway\Tests\Core;
 
-use PHPUnit\Framework\TestCase;
 use PhiGateway\Core\NormalizedRequest;
 use PhiGateway\Exception\GatewayException;
+use PHPUnit\Framework\TestCase;
 
 final class NormalizedRequestTest extends TestCase
 {

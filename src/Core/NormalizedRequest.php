@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 namespace PhiGateway\Core;
 
+use function is_array;
+use function is_bool;
+use function is_float;
+use function is_int;
+use function is_string;
+
+use const JSON_THROW_ON_ERROR;
+
 use PhiGateway\Exception\GatewayException;
 
 /**
@@ -14,9 +22,9 @@ use PhiGateway\Exception\GatewayException;
 final readonly class NormalizedRequest
 {
     /**
-     * @param list<Message> $messages
-     * @param list<string>|null $stop
-     * @param list<array<string, mixed>>|null $tools
+     * @param list<Message>                    $messages
+     * @param list<string>|null                $stop
+     * @param list<array<string, mixed>>|null  $tools
      * @param string|array<string, mixed>|null $toolChoice
      * @param string|array<string, mixed>|null $responseFormat
      */
@@ -24,17 +32,17 @@ final readonly class NormalizedRequest
         public string $model,
         public array $messages,
         public float $temperature = 1.0,
-        public ?int $maxTokens = null,
-        public ?float $topP = null,
-        public ?float $frequencyPenalty = null,
-        public ?float $presencePenalty = null,
-        public ?array $stop = null,
+        public int|null $maxTokens = null,
+        public float|null $topP = null,
+        public float|null $frequencyPenalty = null,
+        public float|null $presencePenalty = null,
+        public array|null $stop = null,
         public bool $stream = false,
-        public ?array $tools = null,
+        public array|null $tools = null,
         public string|array|null $toolChoice = null,
         public string|array|null $responseFormat = null,
-        public ?int $seed = null,
-        public ?string $user = null,
+        public int|null $seed = null,
+        public string|null $user = null,
     ) {
     }
 
@@ -46,12 +54,12 @@ final readonly class NormalizedRequest
     public static function fromArray(array $payload): self
     {
         $model = $payload['model'] ?? null;
-        if (!\is_string($model) || $model === '') {
+        if (!is_string($model) || '' === $model) {
             throw GatewayException::invalidRequest('"model" is required and must be a non-empty string.');
         }
 
         $rawMessages = $payload['messages'] ?? [];
-        if (!\is_array($rawMessages) || $rawMessages === []) {
+        if (!is_array($rawMessages) || [] === $rawMessages) {
             throw GatewayException::invalidRequest('"messages" is required and must be a non-empty array.');
         }
 
@@ -63,29 +71,29 @@ final readonly class NormalizedRequest
             }
         }
 
-        if ($messages === []) {
+        if ([] === $messages) {
             throw GatewayException::invalidRequest('"messages" must contain at least one valid message.');
         }
 
         return new self(
             model: $model,
             messages: $messages,
-            temperature: \is_float($payload['temperature'] ?? null) || \is_int($payload['temperature'] ?? null)
+            temperature: is_float($payload['temperature'] ?? null) || is_int($payload['temperature'] ?? null)
                 ? (float) $payload['temperature'] : 1.0,
-            maxTokens: \is_int($payload['max_tokens'] ?? null) ? $payload['max_tokens'] : null,
-            topP: \is_float($payload['top_p'] ?? null) || \is_int($payload['top_p'] ?? null)
+            maxTokens: is_int($payload['max_tokens'] ?? null) ? $payload['max_tokens'] : null,
+            topP: is_float($payload['top_p'] ?? null) || is_int($payload['top_p'] ?? null)
                 ? (float) $payload['top_p'] : null,
-            frequencyPenalty: \is_float($payload['frequency_penalty'] ?? null) || \is_int($payload['frequency_penalty'] ?? null)
+            frequencyPenalty: is_float($payload['frequency_penalty'] ?? null) || is_int($payload['frequency_penalty'] ?? null)
                 ? (float) $payload['frequency_penalty'] : null,
-            presencePenalty: \is_float($payload['presence_penalty'] ?? null) || \is_int($payload['presence_penalty'] ?? null)
+            presencePenalty: is_float($payload['presence_penalty'] ?? null) || is_int($payload['presence_penalty'] ?? null)
                 ? (float) $payload['presence_penalty'] : null,
-            stop: \is_array($payload['stop'] ?? null) ? $payload['stop'] : null,
-            stream: \is_bool($payload['stream'] ?? null) ? $payload['stream'] : false,
-            tools: \is_array($payload['tools'] ?? null) ? $payload['tools'] : null,
+            stop: is_array($payload['stop'] ?? null) ? $payload['stop'] : null,
+            stream: is_bool($payload['stream'] ?? null) ? $payload['stream'] : false,
+            tools: is_array($payload['tools'] ?? null) ? $payload['tools'] : null,
             toolChoice: $payload['tool_choice'] ?? null,
             responseFormat: $payload['response_format'] ?? null,
-            seed: \is_int($payload['seed'] ?? null) ? $payload['seed'] : null,
-            user: \is_string($payload['user'] ?? null) ? $payload['user'] : null,
+            seed: is_int($payload['seed'] ?? null) ? $payload['seed'] : null,
+            user: is_string($payload['user'] ?? null) ? $payload['user'] : null,
         );
     }
 
@@ -121,27 +129,27 @@ final readonly class NormalizedRequest
             'messages' => array_map(static fn (Message $m): array => $m->toArray(), $this->messages),
         ];
 
-        if ($this->temperature !== 1.0) {
+        if (1.0 !== $this->temperature) {
             $result['temperature'] = $this->temperature;
         }
 
-        if ($this->maxTokens !== null) {
+        if (null !== $this->maxTokens) {
             $result['max_tokens'] = $this->maxTokens;
         }
 
-        if ($this->topP !== null) {
+        if (null !== $this->topP) {
             $result['top_p'] = $this->topP;
         }
 
-        if ($this->frequencyPenalty !== null) {
+        if (null !== $this->frequencyPenalty) {
             $result['frequency_penalty'] = $this->frequencyPenalty;
         }
 
-        if ($this->presencePenalty !== null) {
+        if (null !== $this->presencePenalty) {
             $result['presence_penalty'] = $this->presencePenalty;
         }
 
-        if ($this->stop !== null) {
+        if (null !== $this->stop) {
             $result['stop'] = $this->stop;
         }
 
@@ -149,23 +157,23 @@ final readonly class NormalizedRequest
             $result['stream'] = true;
         }
 
-        if ($this->tools !== null) {
+        if (null !== $this->tools) {
             $result['tools'] = $this->tools;
         }
 
-        if ($this->toolChoice !== null) {
+        if (null !== $this->toolChoice) {
             $result['tool_choice'] = $this->toolChoice;
         }
 
-        if ($this->responseFormat !== null) {
+        if (null !== $this->responseFormat) {
             $result['response_format'] = $this->responseFormat;
         }
 
-        if ($this->seed !== null) {
+        if (null !== $this->seed) {
             $result['seed'] = $this->seed;
         }
 
-        if ($this->user !== null) {
+        if (null !== $this->user) {
             $result['user'] = $this->user;
         }
 

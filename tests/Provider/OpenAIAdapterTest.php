@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace PhiGateway\Tests\Provider;
 
-use PHPUnit\Framework\TestCase;
 use PhiGateway\Core\NormalizedRequest;
 use PhiGateway\Provider\OpenAI\OpenAIAdapter;
+use PHPUnit\Framework\TestCase;
 
 final class OpenAIAdapterTest extends TestCase
 {

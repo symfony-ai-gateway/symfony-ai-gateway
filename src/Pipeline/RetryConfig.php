@@ -18,7 +18,7 @@ final readonly class RetryConfig
 
     public function getDelayForAttempt(int $attempt): int
     {
-        if ($this->backoff === 'exponential') {
+        if ('exponential' === $this->backoff) {
             return $this->delayMs * (2 ** $attempt);
         }
 

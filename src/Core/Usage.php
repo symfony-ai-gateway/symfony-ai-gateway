@@ -40,6 +40,6 @@ final readonly class Usage
 
     public function isEmpty(): bool
     {
-        return $this->totalTokens === 0;
+        return 0 === $this->totalTokens;
     }
 }

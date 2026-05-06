@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace PhiGateway\Tests\Core;
 
-use PHPUnit\Framework\TestCase;
 use PhiGateway\Core\Message;
+use PHPUnit\Framework\TestCase;
 
 final class MessageTest extends TestCase
 {
