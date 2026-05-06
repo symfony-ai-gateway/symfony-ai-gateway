@@ -8,21 +8,24 @@ use AIGateway\Core\Choice;
 use AIGateway\Core\Message;
 use AIGateway\Core\NormalizedRequest;
 use AIGateway\Core\NormalizedResponse;
+use AIGateway\Core\NormalizedStreamChunk;
 use AIGateway\Core\Usage;
-use AIGateway\Provider\ProviderAdapterInterface;
 use AIGateway\Provider\ProviderCapabilities;
 use AIGateway\Provider\ProviderError;
 use AIGateway\Provider\ProviderRequest;
 use AIGateway\Provider\ProviderResponse;
+use AIGateway\Provider\StreamingProviderAdapterInterface;
 
 use function in_array;
 use function is_array;
 
 use const JSON_THROW_ON_ERROR;
 
+use JsonException;
+
 use function sprintf;
 
-final class OllamaAdapter implements ProviderAdapterInterface
+final class OllamaAdapter implements StreamingProviderAdapterInterface
 {
     public function __construct(
         private readonly string $baseUrl = 'http://localhost:11434',
@@ -110,6 +113,62 @@ final class OllamaAdapter implements ProviderAdapterInterface
             usage: $usage,
             statusCode: $response->statusCode,
         );
+    }
+
+    public function translateStreamChunk(string $rawChunk, string $requestedModel): NormalizedStreamChunk|null
+    {
+        $line = trim($rawChunk);
+
+        if ('' === $line) {
+            return null;
+        }
+
+        try {
+            $data = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
+
+        if (!isset($data['response']) && !isset($data['done'])) {
+            return null;
+        }
+
+        $done = $data['done'] ?? false;
+        $delta = $data['response'] ?? '';
+        $model = $data['model'] ?? $requestedModel;
+
+        $usage = null;
+        if ($done && (isset($data['prompt_eval_count']) || isset($data['eval_count']))) {
+            $promptTokens = (int) ($data['prompt_eval_count'] ?? 0);
+            $completionTokens = (int) ($data['eval_count'] ?? 0);
+            $usage = new Usage($promptTokens, $completionTokens, $promptTokens + $completionTokens);
+        }
+
+        return new NormalizedStreamChunk(
+            id: sprintf('ollama-%s', bin2hex(random_bytes(8))),
+            model: $model,
+            provider: $this->getName(),
+            delta: $delta,
+            finishReason: $done ? 'stop' : null,
+            usage: $usage,
+        );
+    }
+
+    public function isStreamDone(string $rawChunk): bool
+    {
+        $line = trim($rawChunk);
+
+        if ('' === $line) {
+            return false;
+        }
+
+        try {
+            $data = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return false;
+        }
+
+        return (bool) ($data['done'] ?? false);
     }
 
     public function isRetryableError(int $statusCode, string $body): bool

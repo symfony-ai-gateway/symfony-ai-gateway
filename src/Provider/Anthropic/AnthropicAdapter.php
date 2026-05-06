@@ -8,12 +8,13 @@ use AIGateway\Core\Choice;
 use AIGateway\Core\Message;
 use AIGateway\Core\NormalizedRequest;
 use AIGateway\Core\NormalizedResponse;
+use AIGateway\Core\NormalizedStreamChunk;
 use AIGateway\Core\Usage;
-use AIGateway\Provider\ProviderAdapterInterface;
 use AIGateway\Provider\ProviderCapabilities;
 use AIGateway\Provider\ProviderError;
 use AIGateway\Provider\ProviderRequest;
 use AIGateway\Provider\ProviderResponse;
+use AIGateway\Provider\StreamingProviderAdapterInterface;
 
 use function in_array;
 
@@ -25,7 +26,7 @@ use function sprintf;
 
 use stdClass;
 
-final class AnthropicAdapter implements ProviderAdapterInterface
+final class AnthropicAdapter implements StreamingProviderAdapterInterface
 {
     private const DEFAULT_BASE_URL = 'https://api.anthropic.com/v1';
     private const API_VERSION = '2023-06-01';
@@ -127,6 +128,83 @@ final class AnthropicAdapter implements ProviderAdapterInterface
                 retryable: $retryable,
             );
         }
+    }
+
+    public function translateStreamChunk(string $rawChunk, string $requestedModel): NormalizedStreamChunk|null
+    {
+        $line = trim($rawChunk);
+
+        $event = null;
+        $json = null;
+
+        if (str_starts_with($line, 'event: ')) {
+            $event = trim(substr($line, 7));
+
+            return null;
+        }
+
+        if (str_starts_with($line, 'data: ')) {
+            $json = trim(substr($line, 6));
+        }
+
+        if (null === $json || '' === $json) {
+            return null;
+        }
+
+        try {
+            $data = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
+
+        $type = $data['type'] ?? '';
+
+        if ('content_block_delta' === $type) {
+            $delta = $data['delta']['text'] ?? '';
+
+            return new NormalizedStreamChunk(
+                id: $data['message']['id'] ?? sprintf('msg_%s', bin2hex(random_bytes(8))),
+                model: $data['model'] ?? $requestedModel,
+                provider: $this->getName(),
+                delta: $delta,
+            );
+        }
+
+        if ('message_delta' === $type) {
+            $stopReason = $data['delta']['stop_reason'] ?? null;
+            $finishReason = $this->mapFinishReason($stopReason);
+            $usage = null;
+
+            if (isset($data['usage'])) {
+                $usage = new Usage(
+                    promptTokens: 0,
+                    completionTokens: $data['usage']['output_tokens'] ?? 0,
+                    totalTokens: $data['usage']['output_tokens'] ?? 0,
+                );
+            }
+
+            return new NormalizedStreamChunk(
+                id: sprintf('msg_%s', bin2hex(random_bytes(8))),
+                model: $requestedModel,
+                provider: $this->getName(),
+                delta: '',
+                finishReason: $finishReason,
+                usage: $usage,
+            );
+        }
+
+        return null;
+    }
+
+    public function isStreamDone(string $rawChunk): bool
+    {
+        $line = trim($rawChunk);
+
+        if (str_starts_with($line, 'event: ')) {
+            return 'message_stop' === trim(substr($line, 7));
+        }
+
+        return false;
     }
 
     public function getCapabilities(): ProviderCapabilities

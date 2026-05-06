@@ -7,12 +7,13 @@ namespace AIGateway\Provider\OpenAI;
 use AIGateway\Core\Choice;
 use AIGateway\Core\NormalizedRequest;
 use AIGateway\Core\NormalizedResponse;
+use AIGateway\Core\NormalizedStreamChunk;
 use AIGateway\Core\Usage;
-use AIGateway\Provider\ProviderAdapterInterface;
 use AIGateway\Provider\ProviderCapabilities;
 use AIGateway\Provider\ProviderError;
 use AIGateway\Provider\ProviderRequest;
 use AIGateway\Provider\ProviderResponse;
+use AIGateway\Provider\StreamingProviderAdapterInterface;
 
 use function in_array;
 
@@ -22,7 +23,7 @@ use JsonException;
 
 use function sprintf;
 
-final readonly class OpenAIAdapter implements ProviderAdapterInterface
+final readonly class OpenAIAdapter implements StreamingProviderAdapterInterface
 {
     private const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 
@@ -108,6 +109,66 @@ final readonly class OpenAIAdapter implements ProviderAdapterInterface
                 retryable: $retryable,
             );
         }
+    }
+
+    public function translateStreamChunk(string $rawChunk, string $requestedModel): NormalizedStreamChunk|null
+    {
+        $line = trim($rawChunk);
+
+        if (!str_starts_with($line, 'data: ')) {
+            return null;
+        }
+
+        $json = trim(substr($line, 6));
+
+        if ('' === $json || '[DONE]' === $json) {
+            return null;
+        }
+
+        try {
+            $data = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
+
+        $id = $data['id'] ?? sprintf('chatcmpl-%s', bin2hex(random_bytes(8)));
+        $model = $data['model'] ?? $requestedModel;
+
+        $choice = $data['choices'][0] ?? [];
+        $delta = $choice['delta']['content'] ?? '';
+        $finishReason = $choice['finish_reason'] ?? null;
+
+        $usage = null;
+        if (isset($data['usage'])) {
+            $usage = Usage::fromArray($data['usage']);
+        }
+
+        if (null !== $finishReason && '' === $delta) {
+            return new NormalizedStreamChunk(
+                id: $id,
+                model: $model,
+                provider: $this->getName(),
+                delta: '',
+                finishReason: $finishReason,
+                usage: $usage,
+            );
+        }
+
+        return new NormalizedStreamChunk(
+            id: $id,
+            model: $model,
+            provider: $this->getName(),
+            delta: $delta,
+            finishReason: null,
+            usage: $usage,
+        );
+    }
+
+    public function isStreamDone(string $rawChunk): bool
+    {
+        $line = trim($rawChunk);
+
+        return str_ends_with($line, 'data: [DONE]');
     }
 
     public function getCapabilities(): ProviderCapabilities

@@ -8,6 +8,7 @@ use AIGateway\Config\ModelRegistry;
 use AIGateway\Core\Gateway;
 use AIGateway\Core\GatewayInterface;
 use AIGateway\Core\ProviderHttpClient;
+use AIGateway\Core\StreamProxy;
 use AIGateway\Pipeline\RetryConfig;
 use AIGateway\Provider\Anthropic\AnthropicAdapter;
 use AIGateway\Provider\OpenAI\OpenAIAdapter;
@@ -126,6 +127,13 @@ final class AIGatewayExtension extends ConfigurableExtension
                 '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$logger' => new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ]);
+
+        $container
+            ->autowire(StreamProxy::class, StreamProxy::class)
+            ->setArguments([
+                '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                '$logger' => new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+            ]);
     }
 
     /**
@@ -179,6 +187,7 @@ final class AIGatewayExtension extends ConfigurableExtension
             ->setArguments([
                 '$modelRegistry' => new Reference(ModelRegistry::class),
                 '$httpClient' => new Reference(ProviderHttpClient::class),
+                '$streamProxy' => new Reference(StreamProxy::class),
                 '$providers' => $providerServices,
                 '$pipelines' => '%ai_gateway.pipelines%',
                 '$aliases' => '%ai_gateway.aliases%',
