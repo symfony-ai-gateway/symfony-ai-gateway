@@ -12,6 +12,7 @@ use AIGateway\Pipeline\RetryConfig;
 use AIGateway\Provider\ProviderAdapterInterface;
 use AIGateway\Provider\ProviderRequest;
 use AIGateway\Provider\ProviderResponse;
+use AIGateway\Provider\RuntimeProviderAdapterInterface;
 use AIGateway\Provider\StreamingProviderAdapterInterface;
 use Generator;
 use Psr\Log\LoggerInterface;
@@ -104,14 +105,18 @@ final class Gateway implements GatewayInterface
             user: $request->user,
         );
 
-        $resolvedTarget = $this->aliases[$streamRequest->model] ?? $streamRequest->model;
-
         if (!$this->modelRegistry->has($streamRequest->model)) {
             throw GatewayException::modelNotFound($streamRequest->model, $this->modelRegistry->getAvailableModels());
         }
 
         $resolution = $this->modelRegistry->resolve($streamRequest->model);
         $adapter = $this->getProvider($resolution->provider);
+
+        if ($adapter instanceof RuntimeProviderAdapterInterface) {
+            yield from $adapter->chatStream($this->withModel($streamRequest, $resolution->model), $streamRequest->model);
+
+            return;
+        }
 
         if (!$adapter instanceof StreamingProviderAdapterInterface) {
             throw GatewayException::invalidRequest(sprintf('Provider "%s" does not support streaming.', $resolution->provider));
@@ -125,6 +130,11 @@ final class Gateway implements GatewayInterface
     private function executeSingle(NormalizedRequest $request, ModelResolution $resolution): NormalizedResponse
     {
         $adapter = $this->getProvider($resolution->provider);
+
+        if ($adapter instanceof RuntimeProviderAdapterInterface) {
+            return $adapter->chat($this->withModel($request, $resolution->model), $request->model);
+        }
+
         $providerRequest = $adapter->translateRequest($this->withModel($request, $resolution->model));
         $providerResponse = $this->httpClient->send($providerRequest);
 

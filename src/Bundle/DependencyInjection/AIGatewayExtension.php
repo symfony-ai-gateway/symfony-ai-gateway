@@ -10,16 +10,17 @@ use AIGateway\Core\GatewayInterface;
 use AIGateway\Core\ProviderHttpClient;
 use AIGateway\Core\StreamProxy;
 use AIGateway\Pipeline\RetryConfig;
-use AIGateway\Provider\Anthropic\AnthropicAdapter;
-use AIGateway\Provider\AzureOpenAI\AzureOpenAIAdapter;
-use AIGateway\Provider\Gemini\GeminiAdapter;
-use AIGateway\Provider\Ollama\OllamaAdapter;
-use AIGateway\Provider\OpenAICompatibleAdapter;
 use AIGateway\Provider\ProviderAdapterInterface;
 use AIGateway\Provider\ProviderCapabilities;
+use AIGateway\Provider\SymfonyAi\SymfonyAiProviderAdapter;
 
 use function sprintf;
 
+use Symfony\AI\Platform\Bridge\Anthropic\Factory as AnthropicFactory;
+use Symfony\AI\Platform\Bridge\Gemini\Factory as GeminiFactory;
+use Symfony\AI\Platform\Bridge\Generic\Factory as GenericFactory;
+use Symfony\AI\Platform\Bridge\Ollama\Factory as OllamaFactory;
+use Symfony\AI\Platform\Bridge\OpenAi\Factory as OpenAiFactory;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -99,85 +100,95 @@ final class AIGatewayExtension extends ConfigurableExtension
 
         foreach ($providers as $name => $providerConfig) {
             $adapterServiceId = sprintf('ai_gateway.provider.%s', $name);
+            $platformServiceId = sprintf('ai_gateway.platform.%s', $name);
             $format = $providerConfig['format'] ?? 'openai';
             $apiKey = $providerConfig['api_key'] ?? '';
             $baseUrl = $providerConfig['base_url'] ?? null;
-            $timeout = $providerConfig['timeout_seconds'] ?? 30;
 
-            match ($format) {
-                'openai' => $this->registerOpenAICompatibleProvider(
-                    $container,
-                    $adapterServiceId,
-                    $name,
-                    $apiKey,
-                    $baseUrl ?? 'https://api.openai.com/v1',
-                    $timeout,
-                    $providerConfig,
-                    $name,
-                ),
-                'anthropic' => $container->register($adapterServiceId, AnthropicAdapter::class)
-                    ->setArguments([
-                        '$apiKey' => $apiKey,
-                        '$baseUrl' => $baseUrl ?? 'https://api.anthropic.com/v1',
-                        '$timeoutSeconds' => $timeout,
-                    ])
-                    ->addTag('ai_gateway.provider', ['provider' => $name]),
-                'ollama' => $container->register($adapterServiceId, OllamaAdapter::class)
-                    ->setArguments([
-                        '$baseUrl' => $baseUrl ?? 'http://localhost:11434',
-                        '$timeoutSeconds' => $timeout,
-                    ])
-                    ->addTag('ai_gateway.provider', ['provider' => $name]),
-                'gemini' => $container->register($adapterServiceId, GeminiAdapter::class)
-                    ->setArguments([
-                        '$apiKey' => $apiKey,
-                        '$baseUrl' => $baseUrl ?? 'https://generativelanguage.googleapis.com/v1beta',
-                        '$timeoutSeconds' => $timeout,
-                    ])
-                    ->addTag('ai_gateway.provider', ['provider' => $name]),
-                'azure' => $container->register($adapterServiceId, AzureOpenAIAdapter::class)
-                    ->setArguments([
-                        '$apiKey' => $apiKey,
-                        '$baseUrl' => $baseUrl ?? 'https://YOUR_RESOURCE.openai.azure.com',
-                        '$deploymentName' => $providerConfig['deployment_name'] ?? 'gpt-4',
-                        '$apiVersion' => $providerConfig['api_version'] ?? '2024-02-15-preview',
-                        '$timeoutSeconds' => $timeout,
-                    ])
-                    ->addTag('ai_gateway.provider', ['provider' => $name]),
-                default => throw new InvalidConfigurationException(sprintf('Unknown provider format "%s".', $format)),
-            };
+            $this->registerSymfonyAiPlatform(
+                container: $container,
+                platformServiceId: $platformServiceId,
+                providerName: $name,
+                format: $format,
+                apiKey: $apiKey,
+                baseUrl: $baseUrl,
+                providerConfig: $providerConfig,
+            );
+
+            $capabilities = new ProviderCapabilities(
+                streaming: $providerConfig['streaming'] ?? true,
+                vision: $providerConfig['vision'] ?? false,
+                functionCalling: $providerConfig['function_calling'] ?? true,
+                maxTokensPerRequest: $providerConfig['max_tokens_per_request'] ?? 128000,
+            );
+
+            $container->register($adapterServiceId, SymfonyAiProviderAdapter::class)
+                ->setArguments([
+                    '$name' => $name,
+                    '$platform' => new Reference($platformServiceId),
+                    '$capabilities' => $capabilities,
+                ])
+                ->addTag('ai_gateway.provider', ['provider' => $name]);
         }
     }
 
     /**
      * @param array<string, mixed> $providerConfig
      */
-    private function registerOpenAICompatibleProvider(
+    private function registerSymfonyAiPlatform(
         ContainerBuilder $container,
-        string $serviceId,
+        string $platformServiceId,
         string $providerName,
+        string $format,
         string $apiKey,
-        string $baseUrl,
-        int $timeout,
+        string|null $baseUrl,
         array $providerConfig,
-        string $name,
     ): void {
-        $capabilities = new ProviderCapabilities(
-            streaming: $providerConfig['streaming'] ?? true,
-            vision: $providerConfig['vision'] ?? false,
-            functionCalling: $providerConfig['function_calling'] ?? true,
-            maxTokensPerRequest: $providerConfig['max_tokens_per_request'] ?? 128000,
-        );
+        $definition = $container->register($platformServiceId);
 
-        $container->register($serviceId, OpenAICompatibleAdapter::class)
-            ->setArguments([
-                '$name' => $name,
-                '$apiKey' => $apiKey,
-                '$baseUrl' => $baseUrl,
-                '$timeoutSeconds' => $timeout,
-                '$capabilities' => $capabilities,
-            ])
-            ->addTag('ai_gateway.provider', ['provider' => $providerName]);
+        match ($format) {
+            'openai' => $definition
+                ->setFactory([OpenAiFactory::class, 'createPlatform'])
+                ->setArguments([
+                    '$apiKey' => $apiKey,
+                    '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                    '$name' => $providerName,
+                ]),
+            'anthropic' => $definition
+                ->setFactory([AnthropicFactory::class, 'createPlatform'])
+                ->setArguments([
+                    '$apiKey' => $apiKey,
+                    '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                    '$name' => $providerName,
+                ]),
+            'gemini' => $definition
+                ->setFactory([GeminiFactory::class, 'createPlatform'])
+                ->setArguments([
+                    '$apiKey' => $apiKey,
+                    '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                    '$name' => $providerName,
+                ]),
+            'ollama' => $definition
+                ->setFactory([OllamaFactory::class, 'createPlatform'])
+                ->setArguments([
+                    '$endpoint' => $baseUrl ?? 'http://localhost:11434',
+                    '$apiKey' => '' !== $apiKey ? $apiKey : null,
+                    '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                    '$name' => $providerName,
+                ]),
+            'azure' => $definition
+                ->setFactory([GenericFactory::class, 'createPlatform'])
+                ->setArguments([
+                    '$baseUrl' => $baseUrl ?? 'https://YOUR_RESOURCE.openai.azure.com',
+                    '$apiKey' => $apiKey,
+                    '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                    '$supportsCompletions' => true,
+                    '$supportsEmbeddings' => false,
+                    '$completionsPath' => $providerConfig['completions_path'] ?? '/openai/deployments/gpt-4/chat/completions?api-version=2024-02-15-preview',
+                    '$name' => $providerName,
+                ]),
+            default => throw new InvalidConfigurationException(sprintf('Unknown provider format "%s".', $format)),
+        };
     }
 
     private function registerProviderHttpClient(ContainerBuilder $container): void
