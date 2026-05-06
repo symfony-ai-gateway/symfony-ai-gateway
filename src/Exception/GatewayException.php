@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Exception;
+namespace AIGateway\Exception;
 
 use RuntimeException;
 

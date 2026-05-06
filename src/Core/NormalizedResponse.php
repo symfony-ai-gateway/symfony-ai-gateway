@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Core;
+namespace AIGateway\Core;
 
 /**
  * Immutable, normalized LLM response in OpenAI-compatible format.

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Config;
+namespace AIGateway\Config;
 
-use PhiGateway\Provider\ProviderCapabilities;
+use AIGateway\Provider\ProviderCapabilities;
 
 /**
  * Resolved model configuration: links an alias to a provider + model name + pricing.

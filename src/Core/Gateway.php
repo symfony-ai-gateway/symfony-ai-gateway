@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Core;
+namespace AIGateway\Core;
 
-use PhiGateway\Config\ModelRegistry;
-use PhiGateway\Config\ModelResolution;
-use PhiGateway\Exception\GatewayException;
-use PhiGateway\Pipeline\FallbackStrategy;
-use PhiGateway\Pipeline\RetryConfig;
-use PhiGateway\Provider\ProviderAdapterInterface;
-use PhiGateway\Provider\ProviderRequest;
-use PhiGateway\Provider\ProviderResponse;
+use AIGateway\Config\ModelRegistry;
+use AIGateway\Config\ModelResolution;
+use AIGateway\Exception\GatewayException;
+use AIGateway\Pipeline\FallbackStrategy;
+use AIGateway\Pipeline\RetryConfig;
+use AIGateway\Provider\ProviderAdapterInterface;
+use AIGateway\Provider\ProviderRequest;
+use AIGateway\Provider\ProviderResponse;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 

@@ -2,19 +2,15 @@
 
 declare(strict_types=1);
 
-namespace AIGateway\Provider\OpenAI;
+namespace AIGateway\Provider;
 
 use AIGateway\Core\Choice;
 use AIGateway\Core\NormalizedRequest;
 use AIGateway\Core\NormalizedResponse;
 use AIGateway\Core\Usage;
-use AIGateway\Provider\ProviderAdapterInterface;
-use AIGateway\Provider\ProviderCapabilities;
-use AIGateway\Provider\ProviderError;
-use AIGateway\Provider\ProviderRequest;
-use AIGateway\Provider\ProviderResponse;
 
 use function in_array;
+use function is_array;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -22,38 +18,21 @@ use JsonException;
 
 use function sprintf;
 
-final readonly class OpenAIAdapter implements ProviderAdapterInterface
+abstract readonly class OpenAICompatibleAdapter implements ProviderAdapterInterface
 {
-    private const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
-
     public function __construct(
-        private string $apiKey,
-        private string $baseUrl = self::DEFAULT_BASE_URL,
-        private string|null $organization = null,
-        private int $timeoutSeconds = 30,
+        protected string $apiKey,
+        protected string $baseUrl,
+        protected int $timeoutSeconds = 30,
     ) {
-    }
-
-    public function getName(): string
-    {
-        return 'openai';
     }
 
     public function translateRequest(NormalizedRequest $request): ProviderRequest
     {
-        $headers = [
-            'Content-Type' => 'application/json',
-            'Authorization' => sprintf('Bearer %s', $this->apiKey),
-        ];
-
-        if (null !== $this->organization) {
-            $headers['OpenAI-Organization'] = $this->organization;
-        }
-
         return new ProviderRequest(
             url: sprintf('%s/chat/completions', rtrim($this->baseUrl, '/')),
             method: 'POST',
-            headers: $headers,
+            headers: $this->buildHeaders(),
             body: json_encode($request->toArray(), JSON_THROW_ON_ERROR),
             timeoutSeconds: $this->timeoutSeconds,
         );
@@ -63,10 +42,12 @@ final readonly class OpenAIAdapter implements ProviderAdapterInterface
     {
         $data = json_decode($response->body, true, 512, JSON_THROW_ON_ERROR);
 
-        $choices = array_map(
-            static fn (array $choice): Choice => Choice::fromArray($choice),
-            $data['choices'] ?? [],
-        );
+        $choices = [];
+        foreach ($data['choices'] ?? [] as $choiceData) {
+            if (is_array($choiceData)) {
+                $choices[] = Choice::fromArray($choiceData);
+            }
+        }
 
         $usage = Usage::fromArray($data['usage'] ?? []);
 
@@ -96,14 +77,14 @@ final readonly class OpenAIAdapter implements ProviderAdapterInterface
 
             return new ProviderError(
                 code: (string) ($error['code'] ?? (string) $statusCode),
-                message: (string) ($error['message'] ?? 'Unknown OpenAI error'),
-                type: (string) ($error['type'] ?? 'openai_error'),
+                message: (string) ($error['message'] ?? 'Unknown error'),
+                type: (string) ($error['type'] ?? $this->getName().'_error'),
                 retryable: $retryable,
             );
         } catch (JsonException) {
             return new ProviderError(
                 code: (string) $statusCode,
-                message: sprintf('OpenAI returned HTTP %d with non-JSON body', $statusCode),
+                message: sprintf('%s returned HTTP %d with non-JSON body', $this->getName(), $statusCode),
                 type: 'http_error',
                 retryable: $retryable,
             );
@@ -114,11 +95,18 @@ final readonly class OpenAIAdapter implements ProviderAdapterInterface
     {
         return new ProviderCapabilities(
             streaming: true,
-            vision: true,
-            audio: true,
-            embeddings: true,
             functionCalling: true,
-            maxTokensPerRequest: 128000,
         );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function buildHeaders(): array
+    {
+        return [
+            'Content-Type' => 'application/json',
+            'Authorization' => sprintf('Bearer %s', $this->apiKey),
+        ];
     }
 }

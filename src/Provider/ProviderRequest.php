@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Provider;
+namespace AIGateway\Provider;
 
 /**
  * HTTP request ready to be sent to a specific provider.

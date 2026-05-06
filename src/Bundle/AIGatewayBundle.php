@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Bundle;
+namespace AIGateway\Bundle;
 
 use function dirname;
 
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 
-final class PhiGatewayBundle extends AbstractBundle
+final class AIGatewayBundle extends AbstractBundle
 {
     public function getPath(): string
     {

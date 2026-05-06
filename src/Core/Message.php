@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Core;
+namespace AIGateway\Core;
 
 /**
  * Immutable value object representing a single message in a chat conversation.

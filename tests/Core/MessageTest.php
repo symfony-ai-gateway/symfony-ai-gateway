@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Tests\Core;
+namespace AIGateway\Tests\Core;
 
-use PhiGateway\Core\Message;
+use AIGateway\Core\Message;
 use PHPUnit\Framework\TestCase;
 
 final class MessageTest extends TestCase

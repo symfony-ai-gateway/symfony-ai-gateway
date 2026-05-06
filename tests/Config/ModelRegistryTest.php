@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Tests\Config;
+namespace AIGateway\Tests\Config;
 
-use PhiGateway\Config\ModelRegistry;
-use PhiGateway\Exception\GatewayException;
+use AIGateway\Config\ModelRegistry;
+use AIGateway\Exception\GatewayException;
 use PHPUnit\Framework\TestCase;
 
 final class ModelRegistryTest extends TestCase

@@ -2,16 +2,17 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Pipeline;
+namespace AIGateway\Pipeline;
+
+use AIGateway\Core\NormalizedRequest;
+use AIGateway\Core\NormalizedResponse;
+use AIGateway\Exception\GatewayException;
+use AIGateway\Provider\ProviderAdapterInterface;
+use AIGateway\Provider\ProviderRequest;
+use AIGateway\Provider\ProviderResponse;
 
 use function in_array;
 
-use PhiGateway\Core\NormalizedRequest;
-use PhiGateway\Core\NormalizedResponse;
-use PhiGateway\Exception\GatewayException;
-use PhiGateway\Provider\ProviderAdapterInterface;
-use PhiGateway\Provider\ProviderRequest;
-use PhiGateway\Provider\ProviderResponse;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -58,7 +59,7 @@ final class FallbackStrategy
 
             for ($attempt = 0; $attempt <= $this->retryConfig->maxAttempts; ++$attempt) {
                 $this->logger->info(sprintf(
-                    '[PhiGateway] Trying model=%s provider=%s attempt=%d/%d',
+                    '[AIGateway] Trying model=%s provider=%s attempt=%d/%d',
                     $modelAlias,
                     $adapter->getName(),
                     $attempt + 1,
@@ -72,7 +73,7 @@ final class FallbackStrategy
                         if (in_array($providerResponse->statusCode, $this->failFastErrors, true)) {
                             $error = $adapter->parseError($providerResponse->statusCode, $providerResponse->body);
                             $this->logger->error(sprintf(
-                                '[PhiGateway] Non-retryable error from %s: %s',
+                                '[AIGateway] Non-retryable error from %s: %s',
                                 $adapter->getName(),
                                 $error->message,
                             ));
@@ -86,7 +87,7 @@ final class FallbackStrategy
 
                         $lastError = $adapter->parseError($providerResponse->statusCode, $providerResponse->body);
                         $this->logger->warning(sprintf(
-                            '[PhiGateway] Retryable error from %s (HTTP %d), attempt %d/%d',
+                            '[AIGateway] Retryable error from %s (HTTP %d), attempt %d/%d',
                             $adapter->getName(),
                             $providerResponse->statusCode,
                             $attempt + 1,
@@ -104,7 +105,7 @@ final class FallbackStrategy
 
                     if ([] !== $attemptedModels) {
                         $this->logger->info(sprintf(
-                            '[PhiGateway] Fallback succeeded: %s (fallback from %s)',
+                            '[AIGateway] Fallback succeeded: %s (fallback from %s)',
                             $modelAlias,
                             implode(', ', $attemptedModels),
                         ));

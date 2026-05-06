@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Config;
+namespace AIGateway\Config;
 
 /**
  * Pricing information for a specific model.

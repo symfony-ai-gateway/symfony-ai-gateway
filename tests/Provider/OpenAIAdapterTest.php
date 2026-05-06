@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Tests\Provider;
+namespace AIGateway\Tests\Provider;
 
-use PhiGateway\Core\NormalizedRequest;
-use PhiGateway\Provider\OpenAI\OpenAIAdapter;
+use AIGateway\Core\NormalizedRequest;
+use AIGateway\Provider\OpenAI\OpenAIAdapter;
 use PHPUnit\Framework\TestCase;
 
 final class OpenAIAdapterTest extends TestCase
@@ -91,7 +91,7 @@ final class OpenAIAdapterTest extends TestCase
             ],
         ];
 
-        $providerResponse = new \PhiGateway\Provider\ProviderResponse(
+        $providerResponse = new \AIGateway\Provider\ProviderResponse(
             statusCode: 200,
             body: json_encode($openaiResponse) ?: '',
         );

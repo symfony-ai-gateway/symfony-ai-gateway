@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Tests\Core;
+namespace AIGateway\Tests\Core;
 
-use PhiGateway\Core\NormalizedRequest;
-use PhiGateway\Exception\GatewayException;
+use AIGateway\Core\NormalizedRequest;
+use AIGateway\Exception\GatewayException;
 use PHPUnit\Framework\TestCase;
 
 final class NormalizedRequestTest extends TestCase

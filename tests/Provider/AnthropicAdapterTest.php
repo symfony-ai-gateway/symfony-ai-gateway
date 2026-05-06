@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Tests\Provider;
+namespace AIGateway\Tests\Provider;
 
-use PhiGateway\Core\NormalizedRequest;
-use PhiGateway\Provider\Anthropic\AnthropicAdapter;
+use AIGateway\Core\NormalizedRequest;
+use AIGateway\Provider\Anthropic\AnthropicAdapter;
 use PHPUnit\Framework\TestCase;
 
 final class AnthropicAdapterTest extends TestCase
@@ -83,7 +83,7 @@ final class AnthropicAdapterTest extends TestCase
             ],
         ];
 
-        $providerResponse = new \PhiGateway\Provider\ProviderResponse(
+        $providerResponse = new \AIGateway\Provider\ProviderResponse(
             statusCode: 200,
             body: json_encode($anthropicResponse) ?: '',
         );
@@ -114,7 +114,7 @@ final class AnthropicAdapterTest extends TestCase
             'usage' => ['input_tokens' => 20, 'output_tokens' => 30],
         ];
 
-        $providerResponse = new \PhiGateway\Provider\ProviderResponse(
+        $providerResponse = new \AIGateway\Provider\ProviderResponse(
             statusCode: 200,
             body: json_encode($anthropicResponse) ?: '',
         );

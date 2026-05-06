@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Config;
+namespace AIGateway\Config;
 
-use PhiGateway\Exception\GatewayException;
+use AIGateway\Exception\GatewayException;
 
 /**
  * Resolves model aliases to their full provider + model configuration.

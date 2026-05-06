@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Core;
+namespace AIGateway\Core;
 
-use PhiGateway\Provider\ProviderRequest;
-use PhiGateway\Provider\ProviderResponse;
+use AIGateway\Provider\ProviderRequest;
+use AIGateway\Provider\ProviderResponse;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -28,7 +28,7 @@ final class ProviderHttpClient
     public function send(ProviderRequest $request): ProviderResponse
     {
         $this->logger->debug(sprintf(
-            '[PhiGateway] HTTP %s %s',
+            '[AIGateway] HTTP %s %s',
             $request->method,
             $request->url,
         ));
@@ -49,7 +49,7 @@ final class ProviderHttpClient
         $body = $response->getContent(false);
 
         $this->logger->debug(sprintf(
-            '[PhiGateway] Response HTTP %d (%d bytes)',
+            '[AIGateway] Response HTTP %d (%d bytes)',
             $statusCode,
             strlen($body),
         ));

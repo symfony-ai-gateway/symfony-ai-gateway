@@ -2,23 +2,24 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Provider\Anthropic;
+namespace AIGateway\Provider\Anthropic;
+
+use AIGateway\Core\Choice;
+use AIGateway\Core\Message;
+use AIGateway\Core\NormalizedRequest;
+use AIGateway\Core\NormalizedResponse;
+use AIGateway\Core\Usage;
+use AIGateway\Provider\ProviderAdapterInterface;
+use AIGateway\Provider\ProviderCapabilities;
+use AIGateway\Provider\ProviderError;
+use AIGateway\Provider\ProviderRequest;
+use AIGateway\Provider\ProviderResponse;
 
 use function in_array;
 
 use const JSON_THROW_ON_ERROR;
 
 use JsonException;
-use PhiGateway\Core\Choice;
-use PhiGateway\Core\Message;
-use PhiGateway\Core\NormalizedRequest;
-use PhiGateway\Core\NormalizedResponse;
-use PhiGateway\Core\Usage;
-use PhiGateway\Provider\ProviderAdapterInterface;
-use PhiGateway\Provider\ProviderCapabilities;
-use PhiGateway\Provider\ProviderError;
-use PhiGateway\Provider\ProviderRequest;
-use PhiGateway\Provider\ProviderResponse;
 
 use function sprintf;
 

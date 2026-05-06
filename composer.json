@@ -1,5 +1,5 @@
 {
-    "name": "phi-gateway/core",
+    "name": "ai-gateway/core",
     "description": "PHP AI Gateway — Unified LLM proxy with fallback, caching, rate limiting and cost tracking",
     "type": "library",
     "license": "MIT",
@@ -27,12 +27,12 @@
     },
     "autoload": {
         "psr-4": {
-            "PhiGateway\\": "src/"
+            "AIGateway\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "PhiGateway\\Tests\\": "tests/"
+            "AIGateway\\Tests\\": "tests/"
         }
     },
     "scripts": {
@@ -49,7 +49,7 @@
     },
     "extra": {
         "symfony": {
-            "bundle": "PhiGateway\\Bundle\\PhiGatewayBundle"
+            "bundle": "AIGateway\\Bundle\\AIGatewayBundle"
         }
     },
     "config": {
@@ -64,7 +64,7 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/mathieu-bd/phi-gateway/issues",
-        "source": "https://github.com/mathieu-bd/phi-gateway"
+        "issues": "https://github.com/mathieu-bd/ai-gateway/issues",
+        "source": "https://github.com/mathieu-bd/ai-gateway"
     }
 }

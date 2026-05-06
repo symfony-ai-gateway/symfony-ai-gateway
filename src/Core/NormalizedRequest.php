@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Core;
+namespace AIGateway\Core;
+
+use AIGateway\Exception\GatewayException;
 
 use function is_array;
 use function is_bool;
@@ -11,8 +13,6 @@ use function is_int;
 use function is_string;
 
 use const JSON_THROW_ON_ERROR;
-
-use PhiGateway\Exception\GatewayException;
 
 /**
  * Immutable, normalized representation of an LLM chat request.

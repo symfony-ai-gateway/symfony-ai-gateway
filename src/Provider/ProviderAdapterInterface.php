@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Provider;
+namespace AIGateway\Provider;
 
-use PhiGateway\Core\NormalizedRequest;
-use PhiGateway\Core\NormalizedResponse;
+use AIGateway\Core\NormalizedRequest;
+use AIGateway\Core\NormalizedResponse;
 
 /**
  * Contract for every LLM provider adapter.

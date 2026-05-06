@@ -1,4 +1,4 @@
-# PhiGateway
+# AIGateway
 
 > PHP AI Gateway — Unified LLM proxy with fallback, caching, rate limiting and cost tracking.
 
@@ -9,7 +9,7 @@ A self-hostable AI gateway in PHP that unifies access to all LLM providers behin
 ## Install
 
 ```bash
-composer require phi-gateway/core
+composer require ai-gateway/core
 ```
 
 ## Quick Start (Symfony Bundle)
@@ -17,8 +17,8 @@ composer require phi-gateway/core
 ### 1. Configure
 
 ```yaml
-# config/packages/phi_gateway.yaml
-phi_gateway:
+# config/packages/ai_gateway.yaml
+ai_gateway:
     providers:
         openai:
             api_key: '%env(OPENAI_API_KEY)%'
@@ -58,8 +58,8 @@ phi_gateway:
 ### 2. Use
 
 ```php
-use PhiGateway\Core\GatewayInterface;
-use PhiGateway\Core\NormalizedRequest;
+use AIGateway\Core\GatewayInterface;
+use AIGateway\Core\NormalizedRequest;
 
 class ChatService
 {

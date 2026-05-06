@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Bundle\DependencyInjection;
+namespace AIGateway\Bundle\DependencyInjection;
 
-use PhiGateway\Config\ModelRegistry;
-use PhiGateway\Core\Gateway;
-use PhiGateway\Core\GatewayInterface;
-use PhiGateway\Core\ProviderHttpClient;
-use PhiGateway\Pipeline\RetryConfig;
-use PhiGateway\Provider\Anthropic\AnthropicAdapter;
-use PhiGateway\Provider\OpenAI\OpenAIAdapter;
-use PhiGateway\Provider\ProviderAdapterInterface;
+use AIGateway\Config\ModelRegistry;
+use AIGateway\Core\Gateway;
+use AIGateway\Core\GatewayInterface;
+use AIGateway\Core\ProviderHttpClient;
+use AIGateway\Pipeline\RetryConfig;
+use AIGateway\Provider\Anthropic\AnthropicAdapter;
+use AIGateway\Provider\OpenAI\OpenAIAdapter;
+use AIGateway\Provider\ProviderAdapterInterface;
 
 use function sprintf;
 
@@ -21,11 +21,11 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpKernel\DependencyInjection\ConfigurableExtension;
 
-final class PhiGatewayExtension extends ConfigurableExtension
+final class AIGatewayExtension extends ConfigurableExtension
 {
     public function getAlias(): string
     {
-        return 'phi_gateway';
+        return 'ai_gateway';
     }
 
     /**
@@ -33,7 +33,7 @@ final class PhiGatewayExtension extends ConfigurableExtension
      */
     protected function loadInternal(array $mergedConfig, ContainerBuilder $container): void
     {
-        $container->setParameter('phi_gateway.default_model', $mergedConfig['default_model'] ?? null);
+        $container->setParameter('ai_gateway.default_model', $mergedConfig['default_model'] ?? null);
 
         $this->registerModelRegistry($mergedConfig, $container);
         $this->registerProviders($mergedConfig, $container);
@@ -44,7 +44,7 @@ final class PhiGatewayExtension extends ConfigurableExtension
 
         $container
             ->registerForAutoconfiguration(ProviderAdapterInterface::class)
-            ->addTag('phi_gateway.provider');
+            ->addTag('ai_gateway.provider');
     }
 
     /**
@@ -55,7 +55,7 @@ final class PhiGatewayExtension extends ConfigurableExtension
         $models = $config['models'] ?? [];
 
         if ([] === $models) {
-            throw new InvalidConfigurationException('At least one model must be configured under "phi_gateway.models".');
+            throw new InvalidConfigurationException('At least one model must be configured under "ai_gateway.models".');
         }
 
         $registryDefinition = $container
@@ -89,11 +89,11 @@ final class PhiGatewayExtension extends ConfigurableExtension
         $providers = $config['providers'] ?? [];
 
         if ([] === $providers) {
-            throw new InvalidConfigurationException('At least one provider must be configured under "phi_gateway.providers".');
+            throw new InvalidConfigurationException('At least one provider must be configured under "ai_gateway.providers".');
         }
 
         foreach ($providers as $name => $providerConfig) {
-            $adapterServiceId = sprintf('phi_gateway.provider.%s', $name);
+            $adapterServiceId = sprintf('ai_gateway.provider.%s', $name);
 
             match ($name) {
                 'openai' => $container->register($adapterServiceId, OpenAIAdapter::class)
@@ -103,7 +103,7 @@ final class PhiGatewayExtension extends ConfigurableExtension
                         '$organization' => $providerConfig['organization'] ?? null,
                         '$timeoutSeconds' => $providerConfig['timeout_seconds'] ?? 30,
                     ])
-                    ->addTag('phi_gateway.provider', ['provider' => $name]),
+                    ->addTag('ai_gateway.provider', ['provider' => $name]),
 
                 'anthropic' => $container->register($adapterServiceId, AnthropicAdapter::class)
                     ->setArguments([
@@ -111,7 +111,7 @@ final class PhiGatewayExtension extends ConfigurableExtension
                         '$baseUrl' => $providerConfig['base_url'] ?? 'https://api.anthropic.com/v1',
                         '$timeoutSeconds' => $providerConfig['timeout_seconds'] ?? 30,
                     ])
-                    ->addTag('phi_gateway.provider', ['provider' => $name]),
+                    ->addTag('ai_gateway.provider', ['provider' => $name]),
 
                 default => null,
             };
@@ -138,14 +138,14 @@ final class PhiGatewayExtension extends ConfigurableExtension
             $pipelines[$name] = $pipelineConfig['models'] ?? [];
         }
 
-        $container->setParameter('phi_gateway.pipelines', $pipelines);
+        $container->setParameter('ai_gateway.pipelines', $pipelines);
 
         $aliases = [];
         foreach ($config['aliases'] ?? [] as $alias => $target) {
             $aliases[$alias] = $target;
         }
 
-        $container->setParameter('phi_gateway.aliases', $aliases);
+        $container->setParameter('ai_gateway.aliases', $aliases);
     }
 
     /**
@@ -167,9 +167,9 @@ final class PhiGatewayExtension extends ConfigurableExtension
     {
         $providerServices = [];
 
-        foreach ($container->findTaggedServiceIds('phi_gateway.provider') as $id => $tags) {
+        foreach ($container->findTaggedServiceIds('ai_gateway.provider') as $id => $tags) {
             foreach ($tags as $tag) {
-                $providerName = $tag['provider'] ?? throw new InvalidConfigurationException(sprintf('Service "%s" tagged "phi_gateway.provider" must have a "provider" attribute.', $id));
+                $providerName = $tag['provider'] ?? throw new InvalidConfigurationException(sprintf('Service "%s" tagged "ai_gateway.provider" must have a "provider" attribute.', $id));
                 $providerServices[$providerName] = new Reference($id);
             }
         }
@@ -180,8 +180,8 @@ final class PhiGatewayExtension extends ConfigurableExtension
                 '$modelRegistry' => new Reference(ModelRegistry::class),
                 '$httpClient' => new Reference(ProviderHttpClient::class),
                 '$providers' => $providerServices,
-                '$pipelines' => '%phi_gateway.pipelines%',
-                '$aliases' => '%phi_gateway.aliases%',
+                '$pipelines' => '%ai_gateway.pipelines%',
+                '$aliases' => '%ai_gateway.aliases%',
                 '$defaultRetryConfig' => new Reference(RetryConfig::class),
                 '$logger' => new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ]);

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Pipeline;
+namespace AIGateway\Pipeline;
 
 /**
  * Configuration for a retry + fallback pipeline.

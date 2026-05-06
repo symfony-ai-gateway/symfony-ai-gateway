@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PhiGateway\Provider;
+namespace AIGateway\Provider;
 
 /**
  * Raw HTTP response received from a provider.
