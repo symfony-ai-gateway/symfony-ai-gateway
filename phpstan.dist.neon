@@ -5,3 +5,4 @@ parameters:
         - tests
     treatPhpDocTypesAsCertain: false
     reportUnmatchedIgnoredErrors: true
+    memoryLimit: 512M

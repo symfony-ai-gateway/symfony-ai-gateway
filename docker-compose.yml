@@ -1,0 +1,19 @@
+services:
+  ai-gateway:
+    build: .
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - AI_GATEWAY_PROVIDERS_OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - AI_GATEWAY_PROVIDERS_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - AI_GATEWAY_PROVIDERS_MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - AI_GATEWAY_PROVIDERS_DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - AI_GATEWAY_PROVIDERS_GROQ_API_KEY=${GROQ_API_KEY:-}
+      - AI_GATEWAY_PROVIDERS_OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - AI_GATEWAY_PROVIDERS_GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AI_GATEWAY_PROVIDERS_AZURE_API_KEY=${AZURE_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3

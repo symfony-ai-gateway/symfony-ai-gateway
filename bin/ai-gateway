@@ -1,0 +1,13 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use AIGateway\Standalone\Command\ServeCommand;
+use Symfony\Component\Console\Application;
+
+require __DIR__.'/../vendor/autoload.php';
+
+$application = new Application('AIGateway', '0.2.0');
+$application->add(new ServeCommand());
+$application->run();
