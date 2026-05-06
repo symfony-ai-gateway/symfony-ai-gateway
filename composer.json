@@ -1,0 +1,70 @@
+{
+    "name": "phi-gateway/core",
+    "description": "PHP AI Gateway — Unified LLM proxy with fallback, caching, rate limiting and cost tracking",
+    "type": "library",
+    "license": "MIT",
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "require": {
+        "php": ">=8.2",
+        "ext-curl": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "psr/log": "^3.0",
+        "psr/event-dispatcher": "^1.0",
+        "symfony/http-client": "^7.0",
+        "symfony/event-dispatcher": "^7.0",
+        "symfony/http-kernel": "^7.0",
+        "symfony/config": "^7.0",
+        "symfony/dependency-injection": "^7.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0",
+        "phpstan/phpstan": "^1.12",
+        "phpstan/phpstan-deprecation-rules": "^1.2",
+        "phpstan/phpstan-strict-rules": "^1.6",
+        "friendsofphp/php-cs-fixer": "^3.64"
+    },
+    "autoload": {
+        "psr-4": {
+            "PhiGateway\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PhiGateway\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:coverage": "XDEBUG_MODE=coverage phpunit --coverage-html coverage/",
+        "stan": "phpstan analyse",
+        "cs:check": "php-cs-fixer fix --dry-run --diff",
+        "cs:fix": "php-cs-fixer fix",
+        "check": [
+            "@stan",
+            "@cs:check",
+            "@test"
+        ]
+    },
+    "extra": {
+        "symfony": {
+            "bundle": "PhiGateway\\Bundle\\PhiGatewayBundle"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": false
+    },
+    "keywords": ["ai", "llm", "gateway", "proxy", "openai", "anthropic", "ollama", "php", "symfony"],
+    "authors": [
+        {
+            "name": "Mathieu BERNARD",
+            "email": "mathieu@etixio.fr"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/mathieu-bd/phi-gateway/issues",
+        "source": "https://github.com/mathieu-bd/phi-gateway"
+    }
+}
