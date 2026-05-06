@@ -19,13 +19,20 @@ use JsonException;
 
 use function sprintf;
 
-abstract readonly class OpenAICompatibleAdapter implements StreamingProviderAdapterInterface
+final readonly class OpenAICompatibleAdapter implements StreamingProviderAdapterInterface
 {
     public function __construct(
-        protected string $apiKey,
-        protected string $baseUrl,
-        protected int $timeoutSeconds = 30,
+        private string $name,
+        private string $apiKey,
+        private string $baseUrl,
+        private int $timeoutSeconds = 30,
+        private ProviderCapabilities|null $capabilities = null,
     ) {
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
     }
 
     public function translateRequest(NormalizedRequest $request): ProviderRequest
@@ -55,7 +62,7 @@ abstract readonly class OpenAICompatibleAdapter implements StreamingProviderAdap
         return new NormalizedResponse(
             id: $data['id'] ?? sprintf('chatcmpl-%s', bin2hex(random_bytes(12))),
             model: $data['model'] ?? $requestedModel,
-            provider: $this->getName(),
+            provider: $this->name,
             choices: $choices,
             usage: $usage,
             statusCode: $response->statusCode,
@@ -79,13 +86,13 @@ abstract readonly class OpenAICompatibleAdapter implements StreamingProviderAdap
             return new ProviderError(
                 code: (string) ($error['code'] ?? (string) $statusCode),
                 message: (string) ($error['message'] ?? 'Unknown error'),
-                type: (string) ($error['type'] ?? $this->getName().'_error'),
+                type: (string) ($error['type'] ?? $this->name.'_error'),
                 retryable: $retryable,
             );
         } catch (JsonException) {
             return new ProviderError(
                 code: (string) $statusCode,
-                message: sprintf('%s returned HTTP %d with non-JSON body', $this->getName(), $statusCode),
+                message: sprintf('%s returned HTTP %d with non-JSON body', $this->name, $statusCode),
                 type: 'http_error',
                 retryable: $retryable,
             );
@@ -128,7 +135,7 @@ abstract readonly class OpenAICompatibleAdapter implements StreamingProviderAdap
             return new NormalizedStreamChunk(
                 id: $id,
                 model: $model,
-                provider: $this->getName(),
+                provider: $this->name,
                 delta: '',
                 finishReason: $finishReason,
                 usage: $usage,
@@ -138,7 +145,7 @@ abstract readonly class OpenAICompatibleAdapter implements StreamingProviderAdap
         return new NormalizedStreamChunk(
             id: $id,
             model: $model,
-            provider: $this->getName(),
+            provider: $this->name,
             delta: $delta,
             usage: $usage,
         );
@@ -153,7 +160,7 @@ abstract readonly class OpenAICompatibleAdapter implements StreamingProviderAdap
 
     public function getCapabilities(): ProviderCapabilities
     {
-        return new ProviderCapabilities(
+        return $this->capabilities ?? new ProviderCapabilities(
             streaming: true,
             functionCalling: true,
         );
@@ -162,7 +169,7 @@ abstract readonly class OpenAICompatibleAdapter implements StreamingProviderAdap
     /**
      * @return array<string, string>
      */
-    protected function buildHeaders(): array
+    private function buildHeaders(): array
     {
         return [
             'Content-Type' => 'application/json',
