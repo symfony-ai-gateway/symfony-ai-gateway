@@ -9,6 +9,8 @@ use AIGateway\Config\ModelRegistry;
 use AIGateway\Config\ModelResolution;
 use AIGateway\Cost\CostTracker;
 use AIGateway\Exception\GatewayException;
+use AIGateway\Logging\RequestLogger;
+use AIGateway\Metrics\PrometheusMetrics;
 use AIGateway\Pipeline\FallbackStrategy;
 use AIGateway\Pipeline\RetryConfig;
 use AIGateway\Provider\ProviderAdapterInterface;
@@ -43,6 +45,8 @@ final class Gateway implements GatewayInterface
         private readonly CacheManager|null $cacheManager = null,
         private readonly MultiLevelRateLimiter|null $rateLimiter = null,
         private readonly CostTracker|null $costTracker = null,
+        private readonly RequestLogger|null $requestLogger = null,
+        private readonly PrometheusMetrics|null $metrics = null,
         LoggerInterface|null $logger = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -113,6 +117,11 @@ final class Gateway implements GatewayInterface
         $this->cacheManager?->store($request, $finalResponse);
         $this->rateLimiter?->increment(['global' => 'global', 'model' => $request->model]);
         $this->costTracker?->record($finalResponse, $requestedModel);
+
+        $log = $this->requestLogger?->log($finalResponse, $requestedModel, $durationMs);
+        if (null !== $log) {
+            $this->metrics?->record($log);
+        }
 
         return $finalResponse;
     }
