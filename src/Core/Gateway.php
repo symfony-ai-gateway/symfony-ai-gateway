@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace AIGateway\Core;
 
+use AIGateway\Cache\CacheManager;
 use AIGateway\Config\ModelRegistry;
 use AIGateway\Config\ModelResolution;
+use AIGateway\Cost\CostTracker;
 use AIGateway\Exception\GatewayException;
 use AIGateway\Pipeline\FallbackStrategy;
 use AIGateway\Pipeline\RetryConfig;
@@ -14,6 +16,7 @@ use AIGateway\Provider\ProviderRequest;
 use AIGateway\Provider\ProviderResponse;
 use AIGateway\Provider\RuntimeProviderAdapterInterface;
 use AIGateway\Provider\StreamingProviderAdapterInterface;
+use AIGateway\RateLimit\MultiLevelRateLimiter;
 use Generator;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -37,6 +40,9 @@ final class Gateway implements GatewayInterface
         private readonly array $pipelines = [],
         private readonly array $aliases = [],
         private readonly RetryConfig $defaultRetryConfig = new RetryConfig(),
+        private readonly CacheManager|null $cacheManager = null,
+        private readonly MultiLevelRateLimiter|null $rateLimiter = null,
+        private readonly CostTracker|null $costTracker = null,
         LoggerInterface|null $logger = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -45,6 +51,25 @@ final class Gateway implements GatewayInterface
     public function chat(NormalizedRequest $request): NormalizedResponse
     {
         $startTime = microtime(true);
+
+        $this->rateLimiter?->check(['global' => 'global', 'model' => $request->model]);
+
+        $cached = $this->cacheManager?->lookup($request);
+        if (null !== $cached) {
+            $this->rateLimiter?->increment(['global' => 'global', 'model' => $request->model]);
+
+            return new NormalizedResponse(
+                id: $cached->id,
+                model: $cached->model,
+                provider: $cached->provider,
+                choices: $cached->choices,
+                usage: $cached->usage,
+                statusCode: $cached->statusCode,
+                systemFingerprint: $cached->systemFingerprint,
+                cacheHit: true,
+                costUsd: 0.0,
+            );
+        }
 
         $requestedModel = $request->model;
 
@@ -71,7 +96,7 @@ final class Gateway implements GatewayInterface
                 $response->usage->completionTokens,
             );
 
-        return new NormalizedResponse(
+        $finalResponse = new NormalizedResponse(
             id: $response->id,
             model: $response->model,
             provider: $response->provider,
@@ -84,6 +109,12 @@ final class Gateway implements GatewayInterface
             cacheHit: false,
             costUsd: $cost,
         );
+
+        $this->cacheManager?->store($request, $finalResponse);
+        $this->rateLimiter?->increment(['global' => 'global', 'model' => $request->model]);
+        $this->costTracker?->record($finalResponse, $requestedModel);
+
+        return $finalResponse;
     }
 
     public function chatStream(NormalizedRequest $request): Generator

@@ -36,6 +36,28 @@ final readonly class NormalizedResponse
     }
 
     /**
+     * @param array<string, mixed> $data
+     */
+    public static function fromArray(array $data): self
+    {
+        $choices = [];
+        foreach ($data['choices'] ?? [] as $choiceData) {
+            $choices[] = Choice::fromArray($choiceData);
+        }
+
+        return new self(
+            id: $data['id'] ?? '',
+            model: $data['model'] ?? '',
+            provider: $data['provider'] ?? '',
+            choices: $choices,
+            usage: Usage::fromArray($data['usage'] ?? []),
+            statusCode: $data['status_code'] ?? 200,
+            systemFingerprint: $data['system_fingerprint'] ?? null,
+            cacheHit: $data['cache_hit'] ?? false,
+        );
+    }
+
+    /**
      * @return array<string, mixed> OpenAI-compatible response format
      */
     public function toArray(): array

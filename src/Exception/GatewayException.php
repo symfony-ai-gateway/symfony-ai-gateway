@@ -40,4 +40,12 @@ class GatewayException extends RuntimeException
     {
         return new self(sprintf('Invalid request: %s', $message));
     }
+
+    public static function rateLimited(string $scope, int $limit, int $resetAt): self
+    {
+        return new self(
+            sprintf('Rate limit exceeded for "%s" (limit: %d, resets at: %d).', $scope, $limit, $resetAt),
+            429,
+        );
+    }
 }
