@@ -1,0 +1,47 @@
+{% extends "dashboard/base.html.twig" %}
+
+{% block title %}AIGateway Dashboard — Teams{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 class="page-title">Teams</h1>
+    <span class="badge badge-green">{{ teams|length }} total</span>
+</div>
+
+{% if teams|length == 0 %}
+<div class="empty">
+    <h3>No teams yet</h3>
+    <p>Create your first team using the CLI:</p>
+    <code style="display:block;margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;font-size:13px">php bin/ai-gateway team:create --name "Engineering"</code>
+</div>
+{% else %}
+<div class="card" style="padding:0;overflow:hidden">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Parent</th>
+                <th>Keys</th>
+                <th>Budget/Day</th>
+                <th>Budget/Month</th>
+                <th>Models</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for team in teams %}
+            <tr>
+                <td><a href="/dashboard/teams/{{ team.id }}">{{ team.name }}</a></td>
+                <td>{{ team.parentId ?? '<span style="color:var(--text2)">root</span>' }}</td>
+                <td>{{ team_key_counts[team.id] ?? 0 }}</td>
+                <td>{{ team.rules.budgetPerDay ? '$' ~ team.rules.budgetPerDay|number_format(2) : 'none' }}</td>
+                <td>{{ team.rules.budgetPerMonth ? '$' ~ team.rules.budgetPerMonth|number_format(2) : 'none' }}</td>
+                <td>{{ team.rules.models ? team.rules.models|join(', ') : 'all' }}</td>
+                <td><a href="/dashboard/teams/{{ team.id }}">view →</a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "dashboard/base.html.twig" %}
+
+{% block title %}AIGateway Dashboard — Overview{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Overview</h1>
+
+<div class="grid grid-4">
+    <div class="card">
+        <h3>API Keys</h3>
+        <div class="value blue">{{ total_keys }}</div>
+        <div style="color:var(--text2);font-size:13px;margin-top:4px">{{ active_keys }} active</div>
+    </div>
+    <div class="card">
+        <h3>Teams</h3>
+        <div class="value" style="color:var(--accent2)">{{ total_teams }}</div>
+    </div>
+    <div class="card">
+        <h3>Requests</h3>
+        <div class="value green">{{ total_requests }}</div>
+        {% if total_errors > 0 %}
+        <div style="color:var(--red);font-size:13px;margin-top:4px">{{ total_errors }} errors</div>
+        {% endif %}
+    </div>
+    <div class="card">
+        <h3>Total Cost</h3>
+        <div class="value yellow">${{ total_cost|number_format(4) }}</div>
+        <div style="color:var(--text2);font-size:13px;margin-top:4px">{{ total_tokens|number_format }} tokens</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:24px">
+    <div class="card">
+        <h3>Avg Response Time</h3>
+        <div class="value" style="color:var(--accent)">{{ avg_duration|number_format(1) }}ms</div>
+    </div>
+    <div class="card">
+        <h3>Error Rate</h3>
+        <div class="value {% if total_requests > 0 and total_errors / total_requests > 0.05 %}red{% else %}green{% endif %}">
+            {% if total_requests > 0 %}{{ (total_errors / total_requests * 100)|number_format(1) }}%{% else %}0%{% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Quick Actions</h2>
+    <div style="display:flex;gap:12px;margin-top:12px">
+        <a href="/dashboard/keys" class="btn btn-primary">Manage API Keys</a>
+        <a href="/dashboard/teams" class="btn btn-primary">Manage Teams</a>
+        <a href="/dashboard/analytics" class="btn btn-primary">View Analytics</a>
+    </div>
+</div>
+{% endblock %}

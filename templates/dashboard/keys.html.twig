@@ -1,0 +1,57 @@
+{% extends "dashboard/base.html.twig" %}
+
+{% block title %}AIGateway Dashboard — API Keys{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 class="page-title">API Keys</h1>
+    <span class="badge badge-green">{{ keys|length }} total</span>
+</div>
+
+{% if keys|length == 0 %}
+<div class="empty">
+    <h3>No API keys yet</h3>
+    <p>Create your first key using the CLI:</p>
+    <code style="display:block;margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;font-size:13px">php bin/ai-gateway key:create --name "My first key"</code>
+</div>
+{% else %}
+<div class="card" style="padding:0;overflow:hidden">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Prefix</th>
+                <th>Team</th>
+                <th>Status</th>
+                <th>Expires</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for key in keys %}
+            <tr>
+                <td><a href="/dashboard/keys/{{ key.id }}">{{ key.name }}</a></td>
+                <td class="mono">{{ key.tokenPrefix }}...</td>
+                <td>{{ key.teamId ?? '<span style="color:var(--text2)">none</span>' }}</td>
+                <td>
+                    {% if key.enabled %}
+                        {% if key.isExpired() %}
+                            <span class="badge badge-yellow">expired</span>
+                        {% else %}
+                            <span class="badge badge-green">active</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="badge badge-red">revoked</span>
+                    {% endif %}
+                </td>
+                <td>{{ key.expiresAt ? key.expiresAt|date('Y-m-d') : 'never' }}</td>
+                <td>{{ key.createdAt|date('Y-m-d H:i') }}</td>
+                <td><a href="/dashboard/keys/{{ key.id }}">view →</a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

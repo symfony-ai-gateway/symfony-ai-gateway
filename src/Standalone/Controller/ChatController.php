@@ -24,9 +24,11 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\Routing\Attribute\Route;
 
 use function trim;
 
+#[Route('/v1', name: 'api_')]
 final class ChatController
 {
     public function __construct(
@@ -39,6 +41,7 @@ final class ChatController
     ) {
     }
 
+    #[Route('/chat/completions', name: 'chat', methods: ['POST'])]
     public function chat(Request $request): JsonResponse|StreamedResponse
     {
         $context = $this->authenticate($request);
@@ -56,6 +59,7 @@ final class ChatController
         return new JsonResponse($response->toArray(), $response->statusCode);
     }
 
+    #[Route('/models', name: 'models', methods: ['GET'])]
     public function models(): JsonResponse
     {
         return new JsonResponse([
@@ -64,6 +68,7 @@ final class ChatController
         ]);
     }
 
+    #[Route('/health', name: 'health', methods: ['GET'])]
     public function health(): JsonResponse
     {
         $models = $this->modelRegistry?->getAvailableModels() ?? [];
@@ -75,6 +80,7 @@ final class ChatController
         ]);
     }
 
+    #[Route('/metrics', name: 'metrics', methods: ['GET'])]
     public function metrics(): Response
     {
         if (null === $this->metrics) {
@@ -88,6 +94,7 @@ final class ChatController
         );
     }
 
+    #[Route('/stats', name: 'stats', methods: ['GET'])]
     public function stats(): JsonResponse
     {
         if (null === $this->requestLogger) {

@@ -1,0 +1,98 @@
+{% extends "dashboard/base.html.twig" %}
+
+{% block title %}AIGateway Dashboard — Key {{ key.name }}{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 class="page-title">Key: {{ key.name }}</h1>
+    {% if key.enabled %}
+    <span class="badge badge-green">active</span>
+    {% else %}
+    <span class="badge badge-red">revoked</span>
+    {% endif %}
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Details</h3>
+        <dl class="def-list">
+            <dt>ID</dt>
+            <dd class="mono">{{ key.id }}</dd>
+            <dt>Prefix</dt>
+            <dd class="mono">{{ key.tokenPrefix }}...</dd>
+            <dt>Team</dt>
+            <dd>{% if team %}<a href="/dashboard/teams/{{ team.id }}">{{ team.name }}</a>{% else %}<span style="color:var(--text2)">none</span>{% endif %}</dd>
+            <dt>Enabled</dt>
+            <dd>{{ key.enabled ? 'yes' : 'no' }}</dd>
+            <dt>Expired</dt>
+            <dd>{{ key.isExpired() ? 'yes' : 'no' }}</dd>
+            <dt>Expires</dt>
+            <dd>{{ key.expiresAt ? key.expiresAt|date('Y-m-d H:i:s') : 'never' }}</dd>
+            <dt>Created</dt>
+            <dd>{{ key.createdAt|date('Y-m-d H:i:s') }}</dd>
+        </dl>
+    </div>
+
+    <div class="card">
+        <h3>Usage Today</h3>
+        {% if usage_today %}
+        <dl class="def-list">
+            <dt>Requests</dt>
+            <dd>{{ usage_today.requests }}</dd>
+            <dt>Tokens</dt>
+            <dd>{{ usage_today.tokens|number_format }}</dd>
+            <dt>Cost</dt>
+            <dd style="color:var(--yellow)">${{ usage_today.costUsd|number_format(6) }}</dd>
+        </dl>
+        {% else %}
+        <p style="color:var(--text2)">No usage recorded today.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if key.overrides %}
+<div class="section">
+    <h2>Key Overrides</h2>
+    <div class="card">
+        <dl class="def-list">
+            <dt>Budget / Day</dt>
+            <dd>{{ key.overrides.budgetPerDay ? '$' ~ key.overrides.budgetPerDay|number_format(2) : 'none' }}</dd>
+            <dt>Budget / Month</dt>
+            <dd>{{ key.overrides.budgetPerMonth ? '$' ~ key.overrides.budgetPerMonth|number_format(2) : 'none' }}</dd>
+            <dt>Rate Limit</dt>
+            <dd>{{ key.overrides.rateLimitPerMinute ? key.overrides.rateLimitPerMinute ~ ' req/min' : 'none' }}</dd>
+            <dt>Models</dt>
+            <dd>{{ key.overrides.models ? key.overrides.models|join(', ') : 'all' }}</dd>
+        </dl>
+    </div>
+</div>
+{% endif %}
+
+{% if team %}
+<div class="section">
+    <h2>Team Rules ({{ team.name }})</h2>
+    <div class="card">
+        <dl class="def-list">
+            <dt>Budget / Day</dt>
+            <dd>{{ team.rules.budgetPerDay ? '$' ~ team.rules.budgetPerDay|number_format(2) : 'none' }}</dd>
+            <dt>Budget / Month</dt>
+            <dd>{{ team.rules.budgetPerMonth ? '$' ~ team.rules.budgetPerMonth|number_format(2) : 'none' }}</dd>
+            <dt>Rate Limit</dt>
+            <dd>{{ team.rules.rateLimitPerMinute ? team.rules.rateLimitPerMinute ~ ' req/min' : 'none' }}</dd>
+            <dt>Models</dt>
+            <dd>{{ team.rules.models ? team.rules.models|join(', ') : 'all' }}</dd>
+        </dl>
+    </div>
+</div>
+{% endif %}
+
+<div class="section">
+    <h2>CLI Commands</h2>
+    <div class="card">
+        <code style="display:block;margin-bottom:8px">php bin/ai-gateway key:info {{ key.id }}</code>
+        {% if key.enabled %}
+        <code style="display:block">php bin/ai-gateway key:revoke {{ key.id }}</code>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
