@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace AIGateway\Bundle\DependencyInjection;
 
+use AIGateway\Auth\ApiKeyAuthenticator;
+use AIGateway\Auth\AuthEnforcer;
+use AIGateway\Auth\Store\DbalKeyStore;
+use AIGateway\Auth\Store\KeyStoreInterface;
+use AIGateway\Auth\Store\SlidingWindowKeyRateLimiter;
 use AIGateway\Config\ModelRegistry;
 use AIGateway\Core\Gateway;
 use AIGateway\Core\GatewayInterface;
@@ -46,6 +51,7 @@ final class AIGatewayExtension extends ConfigurableExtension
         $this->registerProviderHttpClient($container);
         $this->registerPipelines($mergedConfig, $container);
         $this->registerRetryConfig($mergedConfig, $container);
+        $this->registerAuth($mergedConfig, $container);
         $this->registerGateway($container);
 
         $container
@@ -254,7 +260,7 @@ final class AIGatewayExtension extends ConfigurableExtension
             }
         }
 
-        $container
+        $gatewayDef = $container
             ->autowire(Gateway::class, Gateway::class)
             ->setArguments([
                 '$modelRegistry' => new Reference(ModelRegistry::class),
@@ -267,6 +273,43 @@ final class AIGatewayExtension extends ConfigurableExtension
                 '$logger' => new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ]);
 
+        if ($container->hasDefinition(AuthEnforcer::class)) {
+            $gatewayDef->setArgument('$authEnforcer', new Reference(AuthEnforcer::class));
+        }
+
         $container->setAlias(GatewayInterface::class, Gateway::class);
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function registerAuth(array $config, ContainerBuilder $container): void
+    {
+        $authConfig = $config['auth'] ?? [];
+        $enabled = $authConfig['enabled'] ?? false;
+
+        if (!$enabled) {
+            return;
+        }
+
+        $container->register(SlidingWindowKeyRateLimiter::class, SlidingWindowKeyRateLimiter::class);
+
+        $container->register(DbalKeyStore::class, DbalKeyStore::class)
+            ->setArguments([
+                '$connection' => new Reference('doctrine.dbal.default_connection'),
+            ]);
+
+        $container->setAlias(KeyStoreInterface::class, DbalKeyStore::class);
+
+        $container->register(ApiKeyAuthenticator::class, ApiKeyAuthenticator::class)
+            ->setArguments([
+                '$keyStore' => new Reference(KeyStoreInterface::class),
+            ]);
+
+        $container->register(AuthEnforcer::class, AuthEnforcer::class)
+            ->setArguments([
+                '$keyStore' => new Reference(KeyStoreInterface::class),
+                '$rateLimiter' => new Reference(SlidingWindowKeyRateLimiter::class),
+            ]);
     }
 }

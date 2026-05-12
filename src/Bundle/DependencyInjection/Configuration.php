@@ -123,6 +123,17 @@ final class Configuration implements ConfigurationInterface
                         ->end()
                     ->end()
                 ->end()
+
+                ->arrayNode('auth')
+                    ->children()
+                        ->booleanNode('enabled')
+                            ->defaultFalse()
+                        ->end()
+                        ->booleanNode('required')
+                            ->defaultTrue()
+                        ->end()
+                    ->end()
+                ->end()
             ->end();
 
         return $treeBuilder;

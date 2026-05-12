@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace AIGateway\Core;
 
+use AIGateway\Auth\ApiKeyContext;
+use AIGateway\Auth\AuthEnforcer;
 use AIGateway\Cache\CacheManager;
 use AIGateway\Config\ModelRegistry;
 use AIGateway\Config\ModelResolution;
@@ -47,20 +49,31 @@ final class Gateway implements GatewayInterface
         private readonly CostTracker|null $costTracker = null,
         private readonly RequestLogger|null $requestLogger = null,
         private readonly PrometheusMetrics|null $metrics = null,
+        private readonly AuthEnforcer|null $authEnforcer = null,
         LoggerInterface|null $logger = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
 
-    public function chat(NormalizedRequest $request): NormalizedResponse
+    public function chat(NormalizedRequest $request, ApiKeyContext|null $context = null): NormalizedResponse
     {
         $startTime = microtime(true);
+
+        if (null !== $context && null !== $this->authEnforcer) {
+            $this->authEnforcer->checkModelAllowed($context, $request->model);
+            $this->authEnforcer->checkBudget($context);
+            $this->authEnforcer->checkRateLimit($context);
+        }
 
         $this->rateLimiter?->check(['global' => 'global', 'model' => $request->model]);
 
         $cached = $this->cacheManager?->lookup($request);
         if (null !== $cached) {
             $this->rateLimiter?->increment(['global' => 'global', 'model' => $request->model]);
+
+            if (null !== $context) {
+                $this->authEnforcer?->incrementRateLimit($context);
+            }
 
             return new NormalizedResponse(
                 id: $cached->id,
@@ -118,6 +131,15 @@ final class Gateway implements GatewayInterface
         $this->rateLimiter?->increment(['global' => 'global', 'model' => $request->model]);
         $this->costTracker?->record($finalResponse, $requestedModel);
 
+        if (null !== $context && null !== $this->authEnforcer) {
+            $this->authEnforcer->incrementRateLimit($context);
+            $this->authEnforcer->recordUsage(
+                $context,
+                $finalResponse->usage->promptTokens + $finalResponse->usage->completionTokens,
+                $cost,
+            );
+        }
+
         $log = $this->requestLogger?->log($finalResponse, $requestedModel, $durationMs);
         if (null !== $log) {
             $this->metrics?->record($log);
@@ -126,8 +148,14 @@ final class Gateway implements GatewayInterface
         return $finalResponse;
     }
 
-    public function chatStream(NormalizedRequest $request): Generator
+    public function chatStream(NormalizedRequest $request, ApiKeyContext|null $context = null): Generator
     {
+        if (null !== $context && null !== $this->authEnforcer) {
+            $this->authEnforcer->checkModelAllowed($context, $request->model);
+            $this->authEnforcer->checkBudget($context);
+            $this->authEnforcer->checkRateLimit($context);
+        }
+
         $streamRequest = new NormalizedRequest(
             model: $request->model,
             messages: $request->messages,
@@ -151,6 +179,10 @@ final class Gateway implements GatewayInterface
 
         $resolution = $this->modelRegistry->resolve($streamRequest->model);
         $adapter = $this->getProvider($resolution->provider);
+
+        if (null !== $context && null !== $this->authEnforcer) {
+            $this->authEnforcer->incrementRateLimit($context);
+        }
 
         if ($adapter instanceof RuntimeProviderAdapterInterface) {
             yield from $adapter->chatStream($this->withModel($streamRequest, $resolution->model), $streamRequest->model);

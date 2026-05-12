@@ -48,4 +48,22 @@ class GatewayException extends RuntimeException
             429,
         );
     }
+
+    public static function authenticationFailed(string $message): self
+    {
+        return new self($message, 401);
+    }
+
+    public static function forbidden(string $message): self
+    {
+        return new self($message, 403);
+    }
+
+    public static function budgetExceeded(string $keyId, string $period, float $budget, float $used): self
+    {
+        return new self(
+            sprintf('Budget exceeded for key "%s": %s limit $%.4f, used $%.4f.', $keyId, $period, $budget, $used),
+            429,
+        );
+    }
 }

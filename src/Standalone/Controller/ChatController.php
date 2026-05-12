@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace AIGateway\Standalone\Controller;
 
+use AIGateway\Auth\ApiKeyAuthenticator;
+use AIGateway\Auth\ApiKeyContext;
 use AIGateway\Config\ModelRegistry;
 use AIGateway\Core\GatewayInterface;
 use AIGateway\Core\NormalizedRequest;
 use AIGateway\Core\NormalizedStreamChunk;
+use AIGateway\Exception\GatewayException;
 use AIGateway\Logging\RequestLogger;
 use AIGateway\Metrics\PrometheusMetrics;
 
@@ -15,10 +18,14 @@ use function count;
 
 use const JSON_THROW_ON_ERROR;
 
+use function preg_replace;
+
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+
+use function trim;
 
 final class ChatController
 {
@@ -27,20 +34,24 @@ final class ChatController
         private readonly ModelRegistry|null $modelRegistry = null,
         private readonly RequestLogger|null $requestLogger = null,
         private readonly PrometheusMetrics|null $metrics = null,
+        private readonly ApiKeyAuthenticator|null $authenticator = null,
+        private readonly bool $authRequired = true,
     ) {
     }
 
     public function chat(Request $request): JsonResponse|StreamedResponse
     {
+        $context = $this->authenticate($request);
+
         $body = json_decode($request->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
         $normalized = NormalizedRequest::fromArray($body);
 
         if ($normalized->stream) {
-            return $this->streamResponse($normalized);
+            return $this->streamResponse($normalized, $context);
         }
 
-        $response = $this->gateway->chat($normalized);
+        $response = $this->gateway->chat($normalized, $context);
 
         return new JsonResponse($response->toArray(), $response->statusCode);
     }
@@ -59,7 +70,7 @@ final class ChatController
 
         return new JsonResponse([
             'status' => 'ok',
-            'providers_configured' => count($models) > 0 ? true : false,
+            'providers_configured' => count($models) > 0,
             'models_available' => count($models),
         ]);
     }
@@ -90,14 +101,43 @@ final class ChatController
         ]);
     }
 
-    private function streamResponse(NormalizedRequest $request): StreamedResponse
+    private function authenticate(Request $request): ApiKeyContext|null
     {
-        $response = new StreamedResponse(function () use ($request): void {
+        if (null === $this->authenticator) {
+            return null;
+        }
+
+        $authorization = (string) $request->headers->get('Authorization', '');
+
+        if ('' === $authorization) {
+            if ($this->authRequired) {
+                throw GatewayException::authenticationFailed('Missing Authorization header.');
+            }
+
+            return null;
+        }
+
+        $token = trim((string) preg_replace('/^Bearer\s+/i', '', $authorization));
+
+        if ('' === $token) {
+            if ($this->authRequired) {
+                throw GatewayException::authenticationFailed('Invalid Authorization header format.');
+            }
+
+            return null;
+        }
+
+        return $this->authenticator->authenticate($token);
+    }
+
+    private function streamResponse(NormalizedRequest $request, ApiKeyContext|null $context): StreamedResponse
+    {
+        $response = new StreamedResponse(function () use ($request, $context): void {
             header('Content-Type: text/event-stream');
             header('Cache-Control: no-cache');
             header('Connection: keep-alive');
 
-            foreach ($this->gateway->chatStream($request) as $chunk) {
+            foreach ($this->gateway->chatStream($request, $context) as $chunk) {
                 $this->emitSSE($chunk);
             }
 
