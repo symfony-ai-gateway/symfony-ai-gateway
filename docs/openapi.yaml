@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: AIGateway API
+  description: Unified LLM gateway proxy — OpenAI-compatible API with multi-provider fallback, caching, rate limiting, cost tracking, and per-key auth.
+  version: 1.0.0
+  contact:
+    name: Mathieu BERNARD
+    email: mathieu@etixio.fr
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080/v1
+    description: Local development
+
+paths:
+  /chat/completions:
+    post:
+      summary: Create a chat completion
+      description: OpenAI-compatible chat completion endpoint. Supports streaming via SSE.
+      operationId: chatCompletion
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Successful completion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '401':
+          description: Authentication failed
+        '403':
+          description: Model not allowed for this key
+        '429':
+          description: Rate limit or budget exceeded
+        '500':
+          description: Internal error
+
+  /models:
+    get:
+      summary: List available models
+      operationId: listModels
+      responses:
+        '200':
+          description: List of models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    example: list
+                  data:
+                    type: array
+                    items:
+                      type: object
+
+  /health:
+    get:
+      summary: Health check
+      operationId: health
+      responses:
+        '200':
+          description: Service health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  providers_configured:
+                    type: boolean
+                  models_available:
+                    type: integer
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: metrics
+      responses:
+        '200':
+          description: Prometheus text-format metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /stats:
+    get:
+      summary: Usage statistics
+      operationId: stats
+      responses:
+        '200':
+          description: JSON usage statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_requests:
+                    type: integer
+                  total_errors:
+                    type: integer
+                  avg_duration_ms:
+                    type: number
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key prefixed with "aig_"
+
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - model
+        - messages
+      properties:
+        model:
+          type: string
+          description: Model alias or routing alias
+          example: gpt-4o
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+          minItems: 1
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 1.0
+        max_tokens:
+          type: integer
+          minimum: 1
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+        stream:
+          type: boolean
+          default: false
+        stop:
+          type: array
+          items:
+            type: string
+        user:
+          type: string
+        seed:
+          type: integer
+
+    Message:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+        content:
+          type: string
+        name:
+          type: string
+
+    ChatResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        object:
+          type: string
+          example: chat.completion
+        model:
+          type: string
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              message:
+                $ref: '#/components/schemas/Message'
+              finish_reason:
+                type: string
+        usage:
+          type: object
+          properties:
+            prompt_tokens:
+              type: integer
+            completion_tokens:
+              type: integer
+            total_tokens:
+              type: integer

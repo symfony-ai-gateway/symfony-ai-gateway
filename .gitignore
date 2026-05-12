@@ -5,3 +5,5 @@
 /composer.lock
 /.phpstan.cache
 *.cache
+.env
+/data/*.db

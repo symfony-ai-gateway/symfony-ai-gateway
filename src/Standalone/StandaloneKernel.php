@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace AIGateway\Standalone;
 
 use AIGateway\Bundle\AIGatewayBundle;
+use AIGateway\Standalone\EventListener\ExceptionListener;
+use AIGateway\Standalone\EventListener\SecurityHeadersListener;
 
 use function dirname;
 
@@ -47,6 +49,12 @@ final class StandaloneKernel extends Kernel
         $container->extension('twig', [
             'default_path' => '%kernel.project_dir%/templates',
         ]);
+
+        $container->services()
+            ->set(ExceptionListener::class)
+            ->tag('kernel.event_listener', ['event' => 'kernel.exception', 'method' => 'onKernelException'])
+            ->set(SecurityHeadersListener::class)
+            ->tag('kernel.event_listener', ['event' => 'kernel.response', 'method' => 'onKernelResponse']);
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void
