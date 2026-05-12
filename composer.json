@@ -35,7 +35,7 @@
         "symfony/property-info": "^7.4",
         "symfony/routing": "^7.0",
         "symfony/serializer": "^7.4",
-        "symfony/twig-bundle": "^8.0",
+        "symfony/twig-bundle": "^7.0",
         "symfony/type-info": "^7.4",
         "symfony/uid": "^7.4",
         "twig/twig": "^3.24"
