@@ -62,9 +62,20 @@ final class ChatController
     #[Route('/models', name: 'models', methods: ['GET'])]
     public function models(): JsonResponse
     {
+        $models = $this->modelRegistry?->getAvailableModels() ?? [];
+        $data = [];
+
+        foreach ($models as $alias) {
+            $data[] = [
+                'id' => $alias,
+                'object' => 'model',
+                'owned_by' => 'aigateway',
+            ];
+        }
+
         return new JsonResponse([
             'object' => 'list',
-            'data' => [],
+            'data' => $data,
         ]);
     }
 

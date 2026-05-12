@@ -26,6 +26,9 @@ use Symfony\AI\Platform\Bridge\Gemini\Factory as GeminiFactory;
 use Symfony\AI\Platform\Bridge\Generic\Factory as GenericFactory;
 use Symfony\AI\Platform\Bridge\Ollama\Factory as OllamaFactory;
 use Symfony\AI\Platform\Bridge\OpenAi\Factory as OpenAiFactory;
+use Symfony\AI\Platform\Bridge\OpenAi\Gpt;
+use Symfony\AI\Platform\Bridge\OpenAi\ModelCatalog as OpenAiModelCatalog;
+use Symfony\AI\Platform\Capability;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -89,8 +92,6 @@ final class AIGatewayExtension extends ConfigurableExtension
         $registryDefinition->setArguments([
             '$config' => $registryArgs,
         ]);
-
-        $container->setAlias(ModelRegistry::class, ModelRegistry::class);
     }
 
     /**
@@ -103,6 +104,8 @@ final class AIGatewayExtension extends ConfigurableExtension
         if ([] === $providers) {
             throw new InvalidConfigurationException('At least one provider must be configured under "ai_gateway.providers".');
         }
+
+        $modelsByProvider = $this->collectModelsByProvider($config['models'] ?? []);
 
         foreach ($providers as $name => $providerConfig) {
             $adapterServiceId = sprintf('ai_gateway.provider.%s', $name);
@@ -119,20 +122,24 @@ final class AIGatewayExtension extends ConfigurableExtension
                 apiKey: $apiKey,
                 baseUrl: $baseUrl,
                 providerConfig: $providerConfig,
+                modelNames: $modelsByProvider[$name] ?? [],
             );
 
-            $capabilities = new ProviderCapabilities(
-                streaming: $providerConfig['streaming'] ?? true,
-                vision: $providerConfig['vision'] ?? false,
-                functionCalling: $providerConfig['function_calling'] ?? true,
-                maxTokensPerRequest: $providerConfig['max_tokens_per_request'] ?? 128000,
-            );
+            $capabilitiesServiceId = sprintf('ai_gateway.provider.%s.capabilities', $name);
+
+            $container->register($capabilitiesServiceId, ProviderCapabilities::class)
+                ->setArguments([
+                    '$streaming' => $providerConfig['streaming'] ?? true,
+                    '$vision' => $providerConfig['vision'] ?? false,
+                    '$functionCalling' => $providerConfig['function_calling'] ?? true,
+                    '$maxTokensPerRequest' => $providerConfig['max_tokens_per_request'] ?? 128000,
+                ]);
 
             $container->register($adapterServiceId, SymfonyAiProviderAdapter::class)
                 ->setArguments([
                     '$name' => $name,
                     '$platform' => new Reference($platformServiceId),
-                    '$capabilities' => $capabilities,
+                    '$capabilities' => new Reference($capabilitiesServiceId),
                 ])
                 ->addTag('ai_gateway.provider', ['provider' => $name]);
         }
@@ -140,6 +147,7 @@ final class AIGatewayExtension extends ConfigurableExtension
 
     /**
      * @param array<string, mixed> $providerConfig
+     * @param list<string>         $modelNames
      */
     private function registerSymfonyAiPlatform(
         ContainerBuilder $container,
@@ -149,17 +157,12 @@ final class AIGatewayExtension extends ConfigurableExtension
         string $apiKey,
         string|null $baseUrl,
         array $providerConfig,
+        array $modelNames = [],
     ): void {
-        $definition = $container->register($platformServiceId);
+        $definition = $container->register($platformServiceId, \Symfony\AI\Platform\Platform::class);
 
         match ($format) {
-            'openai' => $definition
-                ->setFactory([OpenAiFactory::class, 'createPlatform'])
-                ->setArguments([
-                    '$apiKey' => $apiKey,
-                    '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
-                    '$name' => $providerName,
-                ]),
+            'openai' => $this->registerOpenAiPlatform($definition, $apiKey, $providerName, $container, $modelNames, $baseUrl, $providerConfig['completions_path'] ?? '/v1/chat/completions'),
             'anthropic' => $definition
                 ->setFactory([AnthropicFactory::class, 'createPlatform'])
                 ->setArguments([
@@ -195,6 +198,82 @@ final class AIGatewayExtension extends ConfigurableExtension
                 ]),
             default => throw new InvalidConfigurationException(sprintf('Unknown provider format "%s".', $format)),
         };
+    }
+
+    /**
+     * @param list<string> $modelNames
+     */
+    private function registerOpenAiPlatform(
+        \Symfony\Component\DependencyInjection\Definition $definition,
+        string $apiKey,
+        string $providerName,
+        ContainerBuilder $container,
+        array $modelNames,
+        string|null $baseUrl,
+        string $completionsPath = '/v1/chat/completions',
+    ): void {
+        if (null !== $baseUrl) {
+            $definition
+                ->setFactory([GenericFactory::class, 'createPlatform'])
+                ->setArguments([
+                    '$baseUrl' => $baseUrl,
+                    '$apiKey' => $apiKey,
+                    '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                    '$supportsCompletions' => true,
+                    '$supportsEmbeddings' => false,
+                    '$completionsPath' => $completionsPath,
+                    '$name' => $providerName,
+                ]);
+
+            return;
+        }
+
+        $additionalModels = [];
+        foreach ($modelNames as $modelName) {
+            $additionalModels[$modelName] = [
+                'class' => Gpt::class,
+                'capabilities' => [
+                    Capability::INPUT_MESSAGES,
+                    Capability::OUTPUT_TEXT,
+                    Capability::OUTPUT_STREAMING,
+                    Capability::TOOL_CALLING,
+                ],
+            ];
+        }
+
+        $modelCatalogServiceId = sprintf('ai_gateway.model_catalog.%s', $providerName);
+        $container->register($modelCatalogServiceId, OpenAiModelCatalog::class)
+            ->setArguments([
+                '$additionalModels' => $additionalModels,
+            ]);
+
+        $definition
+            ->setFactory([OpenAiFactory::class, 'createPlatform'])
+            ->setArguments([
+                '$apiKey' => $apiKey,
+                '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                '$modelCatalog' => new Reference($modelCatalogServiceId),
+                '$name' => $providerName,
+            ]);
+    }
+
+    /**
+     * @param array<string, mixed> $modelsConfig
+     *
+     * @return array<string, list<string>>
+     */
+    private function collectModelsByProvider(array $modelsConfig): array
+    {
+        $byProvider = [];
+        foreach ($modelsConfig as $alias => $modelConfig) {
+            $provider = $modelConfig['provider'] ?? '';
+            if ('' === $provider) {
+                continue;
+            }
+            $byProvider[$provider][] = $modelConfig['model'] ?? $alias;
+        }
+
+        return $byProvider;
     }
 
     private function registerProviderHttpClient(ContainerBuilder $container): void

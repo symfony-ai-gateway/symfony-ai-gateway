@@ -7,7 +7,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 
 COPY composer.json ./
-RUN composer install --no-dev --no-scripts --prefer-dist --no-progress --no-autoloader
+RUN composer install --no-dev --prefer-dist --no-progress --no-autoloader
 
 COPY . .
 RUN composer dump-autoload --no-dev --optimize

@@ -6,9 +6,9 @@ namespace AIGateway\Bundle;
 
 use function dirname;
 
-use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
+use Symfony\Component\HttpKernel\Bundle\Bundle;
 
-final class AIGatewayBundle extends AbstractBundle
+final class AIGatewayBundle extends Bundle
 {
     public function getPath(): string
     {

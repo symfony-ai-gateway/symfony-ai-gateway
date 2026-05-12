@@ -1,0 +1,36 @@
+ai_gateway:
+    providers:
+        opencode:
+            format: openai
+            api_key: '%env(OPCODE_API_KEY)%'
+            base_url: 'https://opencode.ai/zen/go'
+            completions_path: '/v1/chat/completions'
+
+    models:
+        qwen3_5_plus:
+            provider: opencode
+            model: 'qwen3.5-plus'
+            pricing: { input: 0.50, output: 2.00 }
+
+        glm_5:
+            provider: opencode
+            model: 'glm-5'
+            pricing: { input: 0.80, output: 3.00 }
+
+        deepseek_v4_flash:
+            provider: opencode
+            model: 'deepseek-v4-flash'
+            pricing: { input: 0.10, output: 0.40 }
+
+    aliases:
+        smart: qwen3_5_plus
+        fast: deepseek_v4_flash
+
+    retry:
+        max_attempts: 2
+        delay_ms: 1000
+        backoff: exponential
+
+    auth:
+        enabled: true
+        required: true
