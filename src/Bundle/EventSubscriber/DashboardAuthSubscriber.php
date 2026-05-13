@@ -40,7 +40,7 @@ final class DashboardAuthSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $submitted = $request->query->get('token', $request->request->get('token', ''));
+        $submitted = $request->query->get('token', '');
 
         if ($submitted === $this->dashboardToken) {
             $request->attributes->set('dashboard_token_valid', true);
