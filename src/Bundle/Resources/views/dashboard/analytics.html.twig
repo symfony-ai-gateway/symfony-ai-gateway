@@ -1,0 +1,111 @@
+{% extends "@AIGateway/dashboard/base.html.twig" %}
+
+{% block title %}AIGateway Dashboard — Analytics{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Analytics</h1>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Requests by Provider</h3>
+        <canvas id="chartProvider" height="200"></canvas>
+    </div>
+    <div class="card">
+        <h3>Cost by Model</h3>
+        <canvas id="chartModelCost" height="200"></canvas>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Recent Requests ({{ total_logs }})</h2>
+    {% if logs|length == 0 %}
+    <div class="empty">
+        <h3>No requests yet</h3>
+        <p>Send a chat completion request to see analytics.</p>
+    </div>
+    {% else %}
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Model</th>
+                    <th>Provider</th>
+                    <th>Tokens</th>
+                    <th>Cost</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for log in logs|slice(0, 50) %}
+            <tr>
+                <td class="mono" style="font-size:12px">{{ log.id[:8] }}</td>
+                <td>{{ log.model }}</td>
+                <td>{{ log.provider }}</td>
+                <td>{{ log.totalTokens|number_format }}</td>
+                <td style="color:var(--yellow)">${{ log.costUsd|number_format(6) }}</td>
+                <td>{{ log.durationMs|number_format(1) }}ms</td>
+                <td>
+                    {% if log.cached %}
+                    <span class="badge badge-green">cached</span>
+                    {% elseif log.statusCode >= 400 %}
+                    <span class="badge badge-red">{{ log.statusCode }}</span>
+                    {% else %}
+                    <span class="badge badge-green">{{ log.statusCode }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if by_provider|length > 0 %}
+<script>
+new Chart(document.getElementById('chartProvider'), {
+    type: 'doughnut',
+    data: {
+        labels: {{ by_provider|keys|json_encode|raw }},
+        datasets: [{
+            data: {{ by_provider|values|json_encode|raw }},
+            backgroundColor: ['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899']
+        }]
+    },
+    options: { plugins: { legend: { labels: { color: '#e4e6f0' } } } }
+});
+</script>
+{% endif %}
+
+{% if by_model|length > 0 %}
+<script>
+new Chart(document.getElementById('chartModelCost'), {
+    type: 'bar',
+    data: {
+        labels: {{ by_model|keys|json_encode|raw }},
+        datasets: [{
+            label: 'Cost (USD)',
+            data: {{ by_model|values|map(v => v.cost)|json_encode|raw }},
+            backgroundColor: '#6366f1'
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        plugins: { legend: { labels: { color: '#e4e6f0' } } },
+        scales: {
+            x: { ticks: { color: '#8b90a8' }, grid: { color: '#2e3348' } },
+            y: { ticks: { color: '#8b90a8' }, grid: { color: '#2e3348' } }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "@AIGateway/dashboard/base.html.twig" %}
+
+{% block title %}AIGateway Dashboard — Error{% endblock %}
+
+{% block content %}
+<div class="empty">
+    <h3>Error</h3>
+    <p>{{ message }}</p>
+    <a href="/dashboard" class="btn btn-primary" style="margin-top:16px">Back to Dashboard</a>
+</div>
+{% endblock %}
