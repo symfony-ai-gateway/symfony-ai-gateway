@@ -10,7 +10,13 @@
         <dt>ID</dt>
         <dd class="mono">{{ team.id }}</dd>
         <dt>Parent</dt>
-        <dd>{{ team.parentId ?? 'root' }}</dd>
+        <dd>
+            {% if parent_team %}
+                <a href="/dashboard/teams/{{ parent_team.id }}">{{ parent_team.name }}</a>
+            {% else %}
+                root
+            {% endif %}
+        </dd>
         <dt>Created</dt>
         <dd>{{ team.createdAt|date('Y-m-d H:i:s') }}</dd>
     </dl>

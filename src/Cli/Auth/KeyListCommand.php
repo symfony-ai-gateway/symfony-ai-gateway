@@ -37,6 +37,12 @@ final class KeyListCommand extends Command
             return Command::SUCCESS;
         }
 
+        $teams = $this->keyStore->listTeams();
+        $teamNames = [];
+        foreach ($teams as $team) {
+            $teamNames[$team->id] = $team->name;
+        }
+
         $io->title('API Keys');
         $io->table(
             ['ID', 'Name', 'Prefix', 'Team', 'Enabled', 'Expires', 'Created'],
@@ -44,7 +50,9 @@ final class KeyListCommand extends Command
                 substr($key->id, 0, 12).'...',
                 $key->name,
                 $key->tokenPrefix.'...',
-                $key->teamId ?? 'none',
+                null !== $key->teamId && isset($teamNames[$key->teamId])
+                    ? $teamNames[$key->teamId]
+                    : ($key->teamId ?? 'none'),
                 $key->enabled ? 'yes' : 'no',
                 null !== $key->expiresAt ? date('Y-m-d', $key->expiresAt) : 'never',
                 date('Y-m-d H:i', $key->createdAt),

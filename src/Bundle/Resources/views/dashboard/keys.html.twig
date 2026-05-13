@@ -33,7 +33,13 @@
             <tr>
                 <td><a href="/dashboard/keys/{{ key.id }}">{{ key.name }}</a></td>
                 <td class="mono">{{ key.tokenPrefix }}...</td>
-                <td>{{ key.teamId ?? '<span style="color:var(--text2)">none</span>' }}</td>
+                <td>
+                    {% if key.teamId and team_names[key.teamId] is defined %}
+                        <a href="/dashboard/teams/{{ key.teamId }}">{{ team_names[key.teamId] }}</a>
+                    {% else %}
+                        <span style="color:var(--text2)">none</span>
+                    {% endif %}
+                </td>
                 <td>
                     {% if key.enabled %}
                         {% if key.isExpired() %}

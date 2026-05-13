@@ -55,9 +55,16 @@ final class DashboardController
     public function keys(): Response
     {
         $keys = $this->keyStore?->listKeys() ?? [];
+        $teams = $this->keyStore?->listTeams() ?? [];
+
+        $teamNames = [];
+        foreach ($teams as $team) {
+            $teamNames[$team->id] = $team->name;
+        }
 
         return new Response($this->twig->render('@AIGateway/dashboard/keys.html.twig', [
             'keys' => $keys,
+            'team_names' => $teamNames,
         ]));
     }
 
@@ -117,8 +124,11 @@ final class DashboardController
         $keys = $this->keyStore?->listKeys() ?? [];
         $teamKeys = array_filter($keys, static fn ($k): bool => $k->teamId === $id);
 
+        $parentTeam = null !== $team->parentId ? $this->keyStore?->findTeamById($team->parentId) : null;
+
         return new Response($this->twig->render('@AIGateway/dashboard/teams_detail.html.twig', [
             'team' => $team,
+            'parent_team' => $parentTeam,
             'ancestry' => $ancestry,
             'team_keys' => $teamKeys,
         ]));

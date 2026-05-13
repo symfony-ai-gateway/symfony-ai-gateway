@@ -43,11 +43,17 @@ final class KeyInfoCommand extends Command
             return Command::FAILURE;
         }
 
+        $teamName = 'none';
+        if (null !== $key->teamId) {
+            $team = $this->keyStore->findTeamById($key->teamId);
+            $teamName = $team?->name ?? $key->teamId;
+        }
+
         $io->title(sprintf('API Key: %s', $key->name));
         $io->definitionList(
             ['ID' => $key->id],
             ['Prefix' => $key->tokenPrefix.'...'],
-            ['Team' => $key->teamId ?? 'none'],
+            ['Team' => $teamName],
             ['Enabled' => $key->enabled ? 'yes' : 'no'],
             ['Expired' => $key->isExpired() ? 'yes' : 'no'],
             ['Expires' => null !== $key->expiresAt ? date('Y-m-d H:i:s', $key->expiresAt) : 'never'],
@@ -68,10 +74,16 @@ final class KeyInfoCommand extends Command
             $team = $this->keyStore->findTeamById($key->teamId);
 
             if (null !== $team) {
+                $parentName = 'root';
+                if (null !== $team->parentId) {
+                    $parent = $this->keyStore->findTeamById($team->parentId);
+                    $parentName = $parent?->name ?? $team->parentId;
+                }
+
                 $io->section(sprintf('Team: %s', $team->name));
                 $io->definitionList(
                     ['ID' => $team->id],
-                    ['Parent' => $team->parentId ?? 'root'],
+                    ['Parent' => $parentName],
                     ['Budget/Day' => null !== $team->rules->budgetPerDay ? sprintf('$%.2f', $team->rules->budgetPerDay) : 'none'],
                     ['Budget/Month' => null !== $team->rules->budgetPerMonth ? sprintf('$%.2f', $team->rules->budgetPerMonth) : 'none'],
                     ['Rate Limit/min' => null !== $team->rules->rateLimitPerMinute ? (string) $team->rules->rateLimitPerMinute : 'none'],
