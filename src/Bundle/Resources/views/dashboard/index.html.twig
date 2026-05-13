@@ -45,9 +45,9 @@
 <div class="section">
     <h2>Quick Actions</h2>
     <div style="display:flex;gap:12px;margin-top:12px">
-        <a href="/dashboard/keys" class="btn btn-primary">Manage API Keys</a>
-        <a href="/dashboard/teams" class="btn btn-primary">Manage Teams</a>
-        <a href="/dashboard/analytics" class="btn btn-primary">View Analytics</a>
+    <a href="{{ dash.turl('/dashboard/keys', dashboard_token|default('')) }}" class="btn btn-primary">Manage API Keys</a>
+    <a href="{{ dash.turl('/dashboard/teams', dashboard_token|default('')) }}" class="btn btn-primary">Manage Teams</a>
+    <a href="{{ dash.turl('/dashboard/analytics', dashboard_token|default('')) }}" class="btn btn-primary">View Analytics</a>
     </div>
 </div>
 {% endblock %}

@@ -21,7 +21,7 @@
             <dt>Prefix</dt>
             <dd class="mono">{{ key.tokenPrefix }}...</dd>
             <dt>Team</dt>
-            <dd>{% if team %}<a href="/dashboard/teams/{{ team.id }}">{{ team.name }}</a>{% else %}<span style="color:var(--text2)">none</span>{% endif %}</dd>
+            <dd>{% if team %}<a href="{{ dash.turl('/dashboard/teams/' ~ team.id, dashboard_token|default('')) }}">{{ team.name }}</a>{% else %}<span style="color:var(--text2)">none</span>{% endif %}</dd>
             <dt>Enabled</dt>
             <dd>{{ key.enabled ? 'yes' : 'no' }}</dd>
             <dt>Expired</dt>

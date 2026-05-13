@@ -1,3 +1,5 @@
+{% macro turl(path, dashboard_token) %}{{ path }}{% if dashboard_token %}?token={{ dashboard_token }}{% endif %}{% endmacro %}
+{% import _self as dash %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -59,12 +61,12 @@
             <h1>AIGateway</h1>
             <span>Dashboard v0.5</span>
         </div>
-        <a href="/dashboard" class="{% if app.request.pathInfo == '/dashboard' %}active{% endif %}">Overview</a>
-        <a href="/dashboard/keys" class="{% if '/keys' in app.request.pathInfo %}active{% endif %}">API Keys</a>
-        <a href="/dashboard/teams" class="{% if '/teams' in app.request.pathInfo %}active{% endif %}">Teams</a>
-        <a href="/dashboard/analytics" class="{% if '/analytics' in app.request.pathInfo %}active{% endif %}">Analytics</a>
-        <a href="/health">Health API</a>
-        <a href="/metrics">Metrics API</a>
+        <a href="{{ dash.turl('/dashboard', dashboard_token|default('')) }}" class="{% if app.request.pathInfo == '/dashboard' or (dashboard_token|default('') and app.request.pathInfo ends with '/dashboard') %}active{% endif %}">Overview</a>
+        <a href="{{ dash.turl('/dashboard/keys', dashboard_token|default('')) }}" class="{% if '/keys' in app.request.pathInfo %}active{% endif %}">API Keys</a>
+        <a href="{{ dash.turl('/dashboard/teams', dashboard_token|default('')) }}" class="{% if '/teams' in app.request.pathInfo %}active{% endif %}">Teams</a>
+        <a href="{{ dash.turl('/dashboard/analytics', dashboard_token|default('')) }}" class="{% if '/analytics' in app.request.pathInfo %}active{% endif %}">Analytics</a>
+        <a href="{{ dash.turl('/v1/health', dashboard_token|default('')) }}">Health API</a>
+        <a href="{{ dash.turl('/v1/metrics', dashboard_token|default('')) }}">Metrics API</a>
     </nav>
     <main>
         {% block content %}{% endblock %}

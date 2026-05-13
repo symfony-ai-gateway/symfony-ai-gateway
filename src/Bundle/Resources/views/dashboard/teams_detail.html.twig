@@ -12,7 +12,7 @@
         <dt>Parent</dt>
         <dd>
             {% if parent_team %}
-                <a href="/dashboard/teams/{{ parent_team.id }}">{{ parent_team.name }}</a>
+                <a href="{{ dash.turl('/dashboard/teams/' ~ parent_team.id, dashboard_token|default('')) }}">{{ parent_team.name }}</a>
             {% else %}
                 root
             {% endif %}
@@ -48,7 +48,7 @@
             {% if a.id == team.id %}
             <strong>{{ a.name }}</strong> <span class="badge badge-green" style="margin-left:8px">current</span>
             {% else %}
-            <a href="/dashboard/teams/{{ a.id }}">{{ a.name }}</a>
+            <a href="{{ dash.turl('/dashboard/teams/' ~ a.id, dashboard_token|default('')) }}">{{ a.name }}</a>
             {% endif %}
         </div>
         {% endfor %}
@@ -65,7 +65,7 @@
             <tbody>
             {% for k in team_keys %}
             <tr>
-                <td><a href="/dashboard/keys/{{ k.id }}">{{ k.name }}</a></td>
+                <td><a href="{{ dash.turl('/dashboard/keys/' ~ k.id, dashboard_token|default('')) }}">{{ k.name }}</a></td>
                 <td class="mono">{{ k.tokenPrefix }}...</td>
                 <td>
                     {% if k.enabled %}
@@ -74,7 +74,7 @@
                     <span class="badge badge-red">revoked</span>
                     {% endif %}
                 </td>
-                <td><a href="/dashboard/keys/{{ k.id }}">view →</a></td>
+                <td><a href="{{ dash.turl('/dashboard/keys/' ~ k.id, dashboard_token|default('')) }}">view →</a></td>
             </tr>
             {% endfor %}
             </tbody>

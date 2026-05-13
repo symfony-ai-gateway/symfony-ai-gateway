@@ -11,6 +11,7 @@ use AIGateway\Auth\Store\KeyStoreInterface;
 use AIGateway\Auth\Store\SlidingWindowKeyRateLimiter;
 use AIGateway\Bundle\Routing\AIGatewayRouteLoader;
 use AIGateway\Config\ModelRegistry;
+use AIGateway\Bundle\EventSubscriber\DashboardAuthSubscriber;
 use AIGateway\Bundle\EventSubscriber\JsonExceptionSubscriber;
 use AIGateway\Controller\ChatController;
 use AIGateway\Controller\DashboardController;
@@ -75,7 +76,7 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
         $this->registerControllers($mergedConfig, $container);
         $this->registerGateway($container);
         $this->registerRouteLoader($mergedConfig, $container);
-        $this->registerEventSubscribers($container);
+        $this->registerEventSubscribers($mergedConfig, $container);
 
         $container
             ->registerForAutoconfiguration(ProviderAdapterInterface::class)
@@ -439,13 +440,29 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
             ->addTag('controller.service_arguments');
     }
 
-    private function registerEventSubscribers(ContainerBuilder $container): void
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function registerEventSubscribers(array $config, ContainerBuilder $container): void
     {
         $container->autowire(RequestLogger::class, RequestLogger::class);
         $container->autowire(PrometheusMetrics::class, PrometheusMetrics::class);
 
         $container->register(JsonExceptionSubscriber::class, JsonExceptionSubscriber::class)
             ->addTag('kernel.event_subscriber');
+
+        $dashboardConfig = $config['dashboard'] ?? [];
+        $dashboardAuth = $dashboardConfig['auth'] ?? [];
+        $dashboardToken = $dashboardAuth['token'] ?? null;
+
+        if (($dashboardAuth['enabled'] ?? false) && null !== $dashboardToken && '' !== $dashboardToken) {
+            $container->register(DashboardAuthSubscriber::class, DashboardAuthSubscriber::class)
+                ->setArguments([
+                    '$dashboardToken' => $dashboardToken,
+                    '$routePrefix' => $config['routes']['prefix'] ?? '',
+                ])
+                ->addTag('kernel.event_subscriber');
+        }
     }
 
     /**

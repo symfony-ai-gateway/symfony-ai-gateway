@@ -31,11 +31,11 @@
         <tbody>
         {% for key in keys %}
             <tr>
-                <td><a href="/dashboard/keys/{{ key.id }}">{{ key.name }}</a></td>
+                <td><a href="{{ dash.turl('/dashboard/keys/' ~ key.id, dashboard_token|default('')) }}">{{ key.name }}</a></td>
                 <td class="mono">{{ key.tokenPrefix }}...</td>
                 <td>
                     {% if key.teamId and team_names[key.teamId] is defined %}
-                        <a href="/dashboard/teams/{{ key.teamId }}">{{ team_names[key.teamId] }}</a>
+                        <a href="{{ dash.turl('/dashboard/teams/' ~ key.teamId, dashboard_token|default('')) }}">{{ team_names[key.teamId] }}</a>
                     {% else %}
                         <span style="color:var(--text2)">none</span>
                     {% endif %}
@@ -53,7 +53,7 @@
                 </td>
                 <td>{{ key.expiresAt ? key.expiresAt|date('Y-m-d') : 'never' }}</td>
                 <td>{{ key.createdAt|date('Y-m-d H:i') }}</td>
-                <td><a href="/dashboard/keys/{{ key.id }}">view →</a></td>
+                <td><a href="{{ dash.turl('/dashboard/keys/' ~ key.id, dashboard_token|default('')) }}">view →</a></td>
             </tr>
         {% endfor %}
         </tbody>

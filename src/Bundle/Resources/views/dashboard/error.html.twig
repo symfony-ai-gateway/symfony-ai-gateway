@@ -6,6 +6,6 @@
 <div class="empty">
     <h3>Error</h3>
     <p>{{ message }}</p>
-    <a href="/dashboard" class="btn btn-primary" style="margin-top:16px">Back to Dashboard</a>
+    <a href="{{ dash.turl('/dashboard', dashboard_token|default('')) }}" class="btn btn-primary" style="margin-top:16px">Back to Dashboard</a>
 </div>
 {% endblock %}

@@ -31,13 +31,13 @@
         <tbody>
         {% for team in teams %}
             <tr>
-                <td><a href="/dashboard/teams/{{ team.id }}">{{ team.name }}</a></td>
+                <td><a href="{{ dash.turl('/dashboard/teams/' ~ team.id, dashboard_token|default('')) }}">{{ team.name }}</a></td>
                 <td>{{ team.parentId ?? '<span style="color:var(--text2)">root</span>' }}</td>
                 <td>{{ team_key_counts[team.id] ?? 0 }}</td>
                 <td>{{ team.rules.budgetPerDay ? '$' ~ team.rules.budgetPerDay|number_format(2) : 'none' }}</td>
                 <td>{{ team.rules.budgetPerMonth ? '$' ~ team.rules.budgetPerMonth|number_format(2) : 'none' }}</td>
                 <td>{{ team.rules.models ? team.rules.models|join(', ') : 'all' }}</td>
-                <td><a href="/dashboard/teams/{{ team.id }}">view →</a></td>
+                <td><a href="{{ dash.turl('/dashboard/teams/' ~ team.id, dashboard_token|default('')) }}">view →</a></td>
             </tr>
         {% endfor %}
         </tbody>
