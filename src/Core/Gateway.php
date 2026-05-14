@@ -15,6 +15,7 @@ use AIGateway\Config\ModelResolution;
 use AIGateway\Cost\CostTracker;
 use AIGateway\Exception\GatewayException;
 use AIGateway\Logging\RequestLogger;
+use AIGateway\Logging\RequestLogStore;
 use AIGateway\Metrics\PrometheusMetrics;
 use AIGateway\Pipeline\FallbackStrategy;
 use AIGateway\Pipeline\RetryConfig;
@@ -59,6 +60,7 @@ final class Gateway implements GatewayInterface
         LoggerInterface|null $logger = null,
         private readonly ConfigStore|null $configStore = null,
         private readonly DynamicProviderFactory|null $dynamicFactory = null,
+        private readonly RequestLogStore|null $requestLogStore = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -159,6 +161,16 @@ final class Gateway implements GatewayInterface
         if (null !== $log) {
             $this->metrics?->record($log);
         }
+
+        // Persist analytics metadata (no request/response content) for dashboard stats
+        $this->requestLogStore?->logResponse(
+            response: $finalResponse,
+            modelAlias: $requestedModel,
+            durationMs: $durationMs,
+            keyId: $context?->apiKey->id,
+            keyName: $context?->apiKey->name,
+            teamId: $context?->apiKey->teamId,
+        );
 
         return $finalResponse;
     }

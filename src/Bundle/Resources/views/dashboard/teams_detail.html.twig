@@ -3,10 +3,40 @@
 
 {% block title %}AIGateway Dashboard — Team {{ team.name }}{% endblock %}
 
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% endblock %}
+
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center">
     <h1 class="page-title">Team: {{ team.name }}</h1>
     <a href="{{ dash.turl('/dashboard/teams/' ~ team.id ~ '/edit', dashboard_token|default('')) }}" class="btn btn-primary" style="padding:6px 16px;font-size:13px">Edit</a>
+</div>
+
+<div class="grid grid-4">
+    <div class="card">
+        <h3>Total Requests</h3>
+        <div class="value blue">{{ team_stats.requests|number_format }}</div>
+    </div>
+    <div class="card">
+        <h3>Total Tokens</h3>
+        <div class="value green">{{ team_stats.tokens|number_format }}</div>
+    </div>
+    <div class="card">
+        <h3>Total Cost</h3>
+        <div class="value yellow">${{ team_stats.cost|number_format(4) }}</div>
+    </div>
+    <div class="card">
+        <h3>Errors</h3>
+        <div class="value {% if team_stats.errors > 0 %}red{% else %}green{% endif %}">{{ team_stats.errors }}</div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Daily Usage (30 days)</h2>
+    <div class="card">
+        <canvas id="chartDailyUsage" height="100"></canvas>
+    </div>
 </div>
 
 <div class="card">
@@ -60,6 +90,27 @@
 </div>
 {% endif %}
 
+{% if member_usage|length > 0 %}
+<div class="section">
+    <h2>Member Usage (sorted by cost)</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>Key</th><th>Requests</th><th>Tokens</th><th>Cost</th></tr></thead>
+            <tbody>
+            {% for m in member_usage %}
+            <tr>
+                <td><a href="{{ dash.turl('/dashboard/keys/' ~ m.key_id, dashboard_token|default('')) }}">{{ m.key_name }}</a></td>
+                <td>{{ m.requests|number_format }}</td>
+                <td>{{ m.tokens|number_format }}</td>
+                <td style="color:var(--yellow)">${{ m.cost|number_format(4) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 {% if team_keys|length > 0 %}
 <div class="section">
     <h2>Keys in this team ({{ team_keys|length }})</h2>
@@ -85,5 +136,37 @@
         </table>
     </div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if team_daily_usage|length > 0 %}
+<script>
+new Chart(document.getElementById('chartDailyUsage'), {
+    type: 'bar',
+    data: {
+        labels: {{ team_daily_usage|map(d => d.date)|json_encode|raw }},
+        datasets: [{
+            label: 'Requests',
+            data: {{ team_daily_usage|map(d => d.requests)|json_encode|raw }},
+            backgroundColor: '#6366f1',
+            yAxisID: 'y'
+        }, {
+            label: 'Cost (USD)',
+            data: {{ team_daily_usage|map(d => d.cost)|json_encode|raw }},
+            backgroundColor: '#f59e0b',
+            yAxisID: 'y1'
+        }]
+    },
+    options: {
+        plugins: { legend: { labels: { color: '#e4e6f0' } } },
+        scales: {
+            x: { ticks: { color: '#8b90a8', maxTicksLimit: 10 }, grid: { color: '#2e3348' } },
+            y: { ticks: { color: '#8b90a8' }, grid: { color: '#2e3348' }, position: 'left' },
+            y1: { ticks: { color: '#f59e0b' }, grid: { display: false }, position: 'right' }
+        }
+    }
+});
+</script>
 {% endif %}
 {% endblock %}

@@ -10,6 +10,7 @@ use AIGateway\Auth\Entity\Team;
 use AIGateway\Auth\Store\KeyStoreInterface;
 use AIGateway\Config\ConfigStore;
 use AIGateway\Logging\RequestLogger;
+use AIGateway\Logging\RequestLogStore;
 
 use function count;
 use function is_string;
@@ -31,6 +32,7 @@ final class DashboardController
         private readonly KeyStoreInterface|null $keyStore = null,
         private readonly RequestLogger|null $requestLogger = null,
         private readonly ConfigStore|null $configStore = null,
+        private readonly RequestLogStore|null $requestLogStore = null,
     ) {
     }
 
@@ -43,14 +45,14 @@ final class DashboardController
         $models = $this->configStore?->listModels() ?? [];
         $activeKeys = count(array_filter($keys, static fn ($k): bool => $k->enabled));
 
-        $totalCost = 0.0;
-        $totalTokens = 0;
+        $globalStats = $this->requestLogStore?->getGlobalStats() ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
+        $dailyUsage = $this->requestLogStore?->getDailyUsage(30) ?? [];
+        $topModels = $this->requestLogStore?->getTopModels(5) ?? [];
+        $topKeys = $this->requestLogStore?->getTopKeys(5) ?? [];
 
+        $avgDuration = 0.0;
         if (null !== $this->requestLogger) {
-            foreach ($this->requestLogger->getLogs() as $log) {
-                $totalCost += $log->costUsd;
-                $totalTokens += $log->totalTokens;
-            }
+            $avgDuration = $this->requestLogger->getAverageDurationMs();
         }
 
         return new Response($this->twig->render('@AIGateway/dashboard/index.html.twig', $this->params($request, [
@@ -59,11 +61,14 @@ final class DashboardController
             'total_teams' => count($teams),
             'total_providers' => count($providers),
             'total_models' => count($models),
-            'total_requests' => $this->requestLogger?->getTotalRequests() ?? 0,
-            'total_errors' => $this->requestLogger?->getTotalErrors() ?? 0,
-            'total_cost' => $totalCost,
-            'total_tokens' => $totalTokens,
-            'avg_duration' => $this->requestLogger?->getAverageDurationMs() ?? 0.0,
+            'total_requests' => $globalStats['requests'],
+            'total_errors' => $globalStats['errors'],
+            'total_cost' => $globalStats['cost'],
+            'total_tokens' => $globalStats['tokens'],
+            'avg_duration' => $avgDuration,
+            'daily_usage' => $dailyUsage,
+            'top_models' => $topModels,
+            'top_keys' => $topKeys,
         ])));
     }
 
@@ -329,12 +334,21 @@ final class DashboardController
             $hasOwnOverrides = null !== $r->budgetPerDay || null !== $r->budgetPerMonth || null !== $r->rateLimitPerMinute || null !== $r->models;
         }
 
+        $keyStats = $this->requestLogStore?->getKeyStats($id) ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
+        $modelBreakdown = $this->requestLogStore?->getKeyModelBreakdown($id) ?? [];
+        $recentLogs = $this->requestLogStore?->getKeyLogs($id, 20) ?? [];
+        $keyDailyUsage = $this->requestLogStore?->getDailyUsage(30) ?? [];
+
         return new Response($this->twig->render('@AIGateway/dashboard/keys_detail.html.twig', $this->params($request, [
             'key' => $key,
             'team' => $team,
             'usage_today' => $usage,
             'effective_rules' => $effectiveRules,
             'has_own_overrides' => $hasOwnOverrides,
+            'key_stats' => $keyStats,
+            'model_breakdown' => $modelBreakdown,
+            'recent_logs' => $recentLogs,
+            'key_daily_usage' => $keyDailyUsage,
         ])));
     }
 
@@ -509,11 +523,18 @@ final class DashboardController
         $teamKeys = array_filter($keys, static fn ($k): bool => $k->teamId === $id);
         $parentTeam = null !== $team->parentId ? $this->keyStore?->findTeamById($team->parentId) : null;
 
+        $teamStats = $this->requestLogStore?->getTeamStats($id) ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
+        $memberUsage = $this->requestLogStore?->getTeamMemberUsage($id) ?? [];
+        $teamDailyUsage = $this->requestLogStore?->getDailyUsage(30) ?? [];
+
         return new Response($this->twig->render('@AIGateway/dashboard/teams_detail.html.twig', $this->params($request, [
             'team' => $team,
             'parent_team' => $parentTeam,
             'ancestry' => $ancestry,
             'team_keys' => $teamKeys,
+            'team_stats' => $teamStats,
+            'member_usage' => $memberUsage,
+            'team_daily_usage' => $teamDailyUsage,
         ])));
     }
 
@@ -564,23 +585,34 @@ final class DashboardController
     #[Route('/dashboard/analytics', name: 'ai_gateway_dashboard_analytics', methods: ['GET'])]
     public function analytics(Request $request): Response
     {
-        $logs = $this->requestLogger?->getLogs() ?? [];
+        $globalStats = $this->requestLogStore?->getGlobalStats() ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
+        $topModels = $this->requestLogStore?->getTopModels(10) ?? [];
+        $topProviders = $this->requestLogStore?->getTopProviders(10) ?? [];
+        $topKeys = $this->requestLogStore?->getTopKeys(10) ?? [];
+        $topTeams = $this->requestLogStore?->getTopTeams(10) ?? [];
+        $dailyUsage = $this->requestLogStore?->getDailyUsage(30) ?? [];
 
+        // Build provider request counts for chart
         $byProvider = [];
-        $byModel = [];
+        foreach ($topProviders as $p) {
+            $byProvider[$p['provider']] = $p['requests'];
+        }
 
-        foreach ($logs as $log) {
-            $byProvider[$log->provider] = ($byProvider[$log->provider] ?? 0) + 1;
-            $byModel[$log->model] ??= ['requests' => 0, 'cost' => 0.0];
-            ++$byModel[$log->model]['requests'];
-            $byModel[$log->model]['cost'] += $log->costUsd;
+        // Build model cost map for chart
+        $byModel = [];
+        foreach ($topModels as $m) {
+            $byModel[$m['model_alias']] = ['requests' => $m['requests'], 'cost' => $m['cost']];
         }
 
         return new Response($this->twig->render('@AIGateway/dashboard/analytics.html.twig', $this->params($request, [
-            'logs' => $logs,
+            'global_stats' => $globalStats,
+            'top_models' => $topModels,
+            'top_providers' => $topProviders,
+            'top_keys' => $topKeys,
+            'top_teams' => $topTeams,
+            'daily_usage' => $dailyUsage,
             'by_provider' => $byProvider,
             'by_model' => $byModel,
-            'total_logs' => count($logs),
         ])));
     }
 

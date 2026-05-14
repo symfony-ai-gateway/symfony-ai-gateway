@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AIGateway\Bundle\EventSubscriber;
 
 use AIGateway\Config\ConfigStore;
+use AIGateway\Logging\RequestLogStore;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -15,6 +16,7 @@ final class ConfigSchemaInitSubscriber implements EventSubscriberInterface
 
     public function __construct(
         private readonly ConfigStore|null $configStore = null,
+        private readonly RequestLogStore|null $requestLogStore = null,
     ) {
     }
 
@@ -27,7 +29,7 @@ final class ConfigSchemaInitSubscriber implements EventSubscriberInterface
 
     public function onKernelRequest(RequestEvent $event): void
     {
-        if ($this->initialized || null === $this->configStore) {
+        if ($this->initialized) {
             return;
         }
 
@@ -36,7 +38,8 @@ final class ConfigSchemaInitSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $this->configStore->initializeSchema();
+        $this->configStore?->initializeSchema();
+        $this->requestLogStore?->initializeSchema();
         $this->initialized = true;
     }
 }

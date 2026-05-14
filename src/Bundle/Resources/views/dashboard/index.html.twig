@@ -3,6 +3,10 @@
 
 {% block title %}AIGateway Dashboard — Overview{% endblock %}
 
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% endblock %}
+
 {% block content %}
 <h1 class="page-title">Overview</h1>
 
@@ -18,7 +22,7 @@
     </div>
     <div class="card">
         <h3>Requests</h3>
-        <div class="value green">{{ total_requests }}</div>
+        <div class="value green">{{ total_requests|number_format }}</div>
         {% if total_errors > 0 %}
         <div style="color:var(--red);font-size:13px;margin-top:4px">{{ total_errors }} errors</div>
         {% endif %}
@@ -43,6 +47,56 @@
     </div>
 </div>
 
+{% if daily_usage|length > 0 %}
+<div class="section">
+    <h2>Usage (30 days)</h2>
+    <div class="card">
+        <canvas id="chartDaily" height="100"></canvas>
+    </div>
+</div>
+{% endif %}
+
+{% if top_models|length > 0 %}
+<div class="section">
+    <h2>Top Models by Cost</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Cost</th></tr></thead>
+            <tbody>
+            {% for m in top_models %}
+            <tr>
+                <td><strong>{{ m.model_alias }}</strong></td>
+                <td>{{ m.requests|number_format }}</td>
+                <td>{{ m.tokens|number_format }}</td>
+                <td style="color:var(--yellow)">${{ m.cost|number_format(4) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if top_keys|length > 0 %}
+<div class="section">
+    <h2>Top Consumers</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>API Key</th><th>Requests</th><th>Cost</th></tr></thead>
+            <tbody>
+            {% for k in top_keys %}
+            <tr>
+                <td><a href="{{ dash.turl('/dashboard/keys/' ~ k.key_id, dashboard_token|default('')) }}">{{ k.key_name }}</a></td>
+                <td>{{ k.requests|number_format }}</td>
+                <td style="color:var(--yellow)">${{ k.cost|number_format(4) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <div class="section">
     <h2>Quick Actions</h2>
     <div style="display:flex;gap:12px;margin-top:12px">
@@ -51,4 +105,36 @@
     <a href="{{ dash.turl('/dashboard/analytics', dashboard_token|default('')) }}" class="btn btn-primary">View Analytics</a>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if daily_usage|length > 0 %}
+<script>
+new Chart(document.getElementById('chartDaily'), {
+    type: 'bar',
+    data: {
+        labels: {{ daily_usage|map(d => d.date)|json_encode|raw }},
+        datasets: [{
+            label: 'Requests',
+            data: {{ daily_usage|map(d => d.requests)|json_encode|raw }},
+            backgroundColor: '#6366f1',
+            yAxisID: 'y'
+        }, {
+            label: 'Cost (USD)',
+            data: {{ daily_usage|map(d => d.cost)|json_encode|raw }},
+            backgroundColor: '#f59e0b',
+            yAxisID: 'y1'
+        }]
+    },
+    options: {
+        plugins: { legend: { labels: { color: '#e4e6f0' } } },
+        scales: {
+            x: { ticks: { color: '#8b90a8', maxTicksLimit: 10 }, grid: { color: '#2e3348' } },
+            y: { ticks: { color: '#8b90a8' }, grid: { color: '#2e3348' }, position: 'left' },
+            y1: { ticks: { color: '#f59e0b' }, grid: { display: false }, position: 'right' }
+        }
+    }
+});
+</script>
+{% endif %}
 {% endblock %}

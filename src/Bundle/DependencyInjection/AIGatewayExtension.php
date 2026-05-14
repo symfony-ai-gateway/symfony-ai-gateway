@@ -23,6 +23,7 @@ use AIGateway\Core\GatewayInterface;
 use AIGateway\Core\ProviderHttpClient;
 use AIGateway\Core\StreamProxy;
 use AIGateway\Logging\RequestLogger;
+use AIGateway\Logging\RequestLogStore;
 use AIGateway\Metrics\PrometheusMetrics;
 use AIGateway\Pipeline\RetryConfig;
 use AIGateway\Provider\ProviderAdapterInterface;
@@ -364,6 +365,7 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
                 '$logger' => new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$configStore' => new Reference(ConfigStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$dynamicFactory' => new Reference(DynamicProviderFactory::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                '$requestLogStore' => new Reference(RequestLogStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ]);
 
         if ($container->hasDefinition(AuthEnforcer::class)) {
@@ -421,6 +423,7 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
                 '$keyStore' => new Reference(KeyStoreInterface::class),
                 '$requestLogger' => new Reference('AIGateway\Logging\RequestLogger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$configStore' => new Reference(ConfigStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                '$requestLogStore' => new Reference(RequestLogStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ])
             ->addTag('controller.service_arguments');
     }
@@ -435,6 +438,11 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
         $container->register(DynamicProviderFactory::class, DynamicProviderFactory::class)
             ->setArguments([
                 '$httpClient' => new Reference('http_client'),
+            ]);
+
+        $container->register(RequestLogStore::class, RequestLogStore::class)
+            ->setArguments([
+                '$connection' => new Reference('doctrine.dbal.default_connection', ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ]);
     }
 
@@ -452,6 +460,7 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
         $container->register(ConfigSchemaInitSubscriber::class, ConfigSchemaInitSubscriber::class)
             ->setArguments([
                 '$configStore' => new Reference(ConfigStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                '$requestLogStore' => new Reference(RequestLogStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ])
             ->addTag('kernel.event_subscriber');
 

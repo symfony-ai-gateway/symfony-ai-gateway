@@ -10,6 +10,35 @@
 {% block content %}
 <h1 class="page-title">Analytics</h1>
 
+<div class="grid grid-4">
+    <div class="card">
+        <h3>Total Requests</h3>
+        <div class="value blue">{{ global_stats.requests|number_format }}</div>
+    </div>
+    <div class="card">
+        <h3>Total Tokens</h3>
+        <div class="value green">{{ global_stats.tokens|number_format }}</div>
+    </div>
+    <div class="card">
+        <h3>Total Cost</h3>
+        <div class="value yellow">${{ global_stats.cost|number_format(4) }}</div>
+    </div>
+    <div class="card">
+        <h3>Errors</h3>
+        <div class="value {% if global_stats.errors > 0 %}red{% else %}green{% endif %}">{{ global_stats.errors }}</div>
+        {% if global_stats.requests > 0 %}
+        <div style="color:var(--text2);font-size:13px;margin-top:4px">{{ (global_stats.errors / global_stats.requests * 100)|number_format(1) }}% error rate</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section">
+    <h2>Daily Usage (30 days)</h2>
+    <div class="card">
+        <canvas id="chartDaily" height="100"></canvas>
+    </div>
+</div>
+
 <div class="grid grid-2">
     <div class="card">
         <h3>Requests by Provider</h3>
@@ -21,55 +50,101 @@
     </div>
 </div>
 
+{% if top_keys|length > 0 %}
 <div class="section">
-    <h2>Recent Requests ({{ total_logs }})</h2>
-    {% if logs|length == 0 %}
-    <div class="empty">
-        <h3>No requests yet</h3>
-        <p>Send a chat completion request to see analytics.</p>
+    <h2>Top Consumers</h2>
+    <div class="grid grid-2">
+        <div class="card" style="padding:0;overflow:hidden">
+            <table>
+                <thead><tr><th>API Key</th><th>Requests</th><th>Cost</th></tr></thead>
+                <tbody>
+                {% for k in top_keys %}
+                <tr>
+                    <td><a href="{{ dash.turl('/dashboard/keys/' ~ k.key_id, dashboard_token|default('')) }}">{{ k.key_name }}</a></td>
+                    <td>{{ k.requests|number_format }}</td>
+                    <td style="color:var(--yellow)">${{ k.cost|number_format(4) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+            <table>
+                <thead><tr><th>Team</th><th>Requests</th><th>Cost</th></tr></thead>
+                <tbody>
+                {% for t in top_teams %}
+                <tr>
+                    <td><a href="{{ dash.turl('/dashboard/teams/' ~ t.team_id, dashboard_token|default('')) }}">{{ t.team_name }}</a></td>
+                    <td>{{ t.requests|number_format }}</td>
+                    <td style="color:var(--yellow)">${{ t.cost|number_format(4) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-    {% else %}
+</div>
+{% endif %}
+
+{% if top_providers|length > 0 %}
+<div class="section">
+    <h2>Provider Breakdown</h2>
     <div class="card" style="padding:0;overflow:hidden">
         <table>
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Model</th>
-                    <th>Provider</th>
-                    <th>Tokens</th>
-                    <th>Cost</th>
-                    <th>Duration</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
+            <thead><tr><th>Provider</th><th>Requests</th><th>Cost</th></tr></thead>
             <tbody>
-            {% for log in logs|slice(0, 50) %}
+            {% for p in top_providers %}
             <tr>
-                <td class="mono" style="font-size:12px">{{ log.id[:8] }}</td>
-                <td>{{ log.model }}</td>
-                <td>{{ log.provider }}</td>
-                <td>{{ log.totalTokens|number_format }}</td>
-                <td style="color:var(--yellow)">${{ log.costUsd|number_format(6) }}</td>
-                <td>{{ log.durationMs|number_format(1) }}ms</td>
-                <td>
-                    {% if log.cached %}
-                    <span class="badge badge-green">cached</span>
-                    {% elseif log.statusCode >= 400 %}
-                    <span class="badge badge-red">{{ log.statusCode }}</span>
-                    {% else %}
-                    <span class="badge badge-green">{{ log.statusCode }}</span>
-                    {% endif %}
-                </td>
+                <td><strong>{{ p.provider }}</strong></td>
+                <td>{{ p.requests|number_format }}</td>
+                <td style="color:var(--yellow)">${{ p.cost|number_format(4) }}</td>
             </tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
-    {% endif %}
 </div>
+{% endif %}
+
+{% if global_stats.requests == 0 %}
+<div class="empty">
+    <h3>No requests yet</h3>
+    <p>Send a chat completion request to see analytics.</p>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
+{% if daily_usage|length > 0 %}
+<script>
+new Chart(document.getElementById('chartDaily'), {
+    type: 'bar',
+    data: {
+        labels: {{ daily_usage|map(d => d.date)|json_encode|raw }},
+        datasets: [{
+            label: 'Requests',
+            data: {{ daily_usage|map(d => d.requests)|json_encode|raw }},
+            backgroundColor: '#6366f1',
+            yAxisID: 'y'
+        }, {
+            label: 'Tokens',
+            data: {{ daily_usage|map(d => d.tokens)|json_encode|raw }},
+            backgroundColor: '#22c55e',
+            yAxisID: 'y1'
+        }]
+    },
+    options: {
+        plugins: { legend: { labels: { color: '#e4e6f0' } } },
+        scales: {
+            x: { ticks: { color: '#8b90a8', maxTicksLimit: 15 }, grid: { color: '#2e3348' } },
+            y: { ticks: { color: '#8b90a8' }, grid: { color: '#2e3348' }, position: 'left' },
+            y1: { ticks: { color: '#22c55e' }, grid: { display: false }, position: 'right' }
+        }
+    }
+});
+</script>
+{% endif %}
+
 {% if by_provider|length > 0 %}
 <script>
 new Chart(document.getElementById('chartProvider'), {
