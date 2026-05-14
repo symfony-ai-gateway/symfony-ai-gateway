@@ -19,6 +19,10 @@ final class DbalKeyStore implements KeyStoreInterface
     public function __construct(
         private readonly Connection $connection,
     ) {
+        $platform = $this->connection->getDatabasePlatform();
+        if (!$platform->hasDoctrineTypeMappingFor('json')) {
+            $platform->registerDoctrineTypeMapping('json', 'text');
+        }
     }
 
     public function initializeSchema(): void

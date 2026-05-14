@@ -16,6 +16,10 @@ final class SlidingWindowKeyRateLimiter
     public function __construct(
         private readonly Connection $connection,
     ) {
+        $platform = $this->connection->getDatabasePlatform();
+        if (!$platform->hasDoctrineTypeMappingFor('json')) {
+            $platform->registerDoctrineTypeMapping('json', 'text');
+        }
     }
 
     public function isAllowed(string $keyId, int $maxPerMinute): RateLimitResult
@@ -59,18 +63,19 @@ final class SlidingWindowKeyRateLimiter
             return;
         }
 
-        $schemaManager = $this->connection->createSchemaManager();
-        $schema = $schemaManager->introspectSchema();
+        $this->connection->executeStatement('
+            CREATE TABLE IF NOT EXISTS gateway_rate_limits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                key_id VARCHAR(64) NOT NULL,
+                timestamp INTEGER NOT NULL
+            )
+        ');
 
-        if (!$schema->hasTable('gateway_rate_limits')) {
-            $table = $schema->createTable('gateway_rate_limits');
-            $table->addColumn('id', 'integer', ['autoincrement' => true]);
-            $table->addColumn('key_id', 'string', ['length' => 64, 'notnull' => true]);
-            $table->addColumn('timestamp', 'integer', ['notnull' => true]);
-            $table->setPrimaryKey(['id']);
-            $table->addIndex(['key_id', 'timestamp'], 'idx_rate_key_ts');
-
-            $schemaManager->createTable($table);
+        try {
+            $this->connection->executeStatement('
+                CREATE INDEX IF NOT EXISTS idx_rate_key_ts ON gateway_rate_limits (key_id, timestamp)
+            ');
+        } catch (\Throwable) {
         }
 
         $this->schemaInitialized = true;
