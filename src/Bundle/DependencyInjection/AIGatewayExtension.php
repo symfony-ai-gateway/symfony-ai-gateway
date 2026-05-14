@@ -428,7 +428,6 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
         $container->register(ChatController::class, ChatController::class)
             ->setArguments([
                 '$gateway' => new Reference(GatewayInterface::class),
-                '$modelRegistry' => new Reference(ModelRegistry::class),
                 '$configStore' => new Reference(ConfigStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$requestLogger' => new Reference('AIGateway\Logging\RequestLogger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$metrics' => new Reference('AIGateway\Metrics\PrometheusMetrics', ContainerInterface::NULL_ON_INVALID_REFERENCE),

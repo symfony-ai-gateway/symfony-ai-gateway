@@ -7,7 +7,6 @@ namespace AIGateway\Controller;
 use AIGateway\Auth\ApiKeyAuthenticator;
 use AIGateway\Auth\ApiKeyContext;
 use AIGateway\Config\ConfigStore;
-use AIGateway\Config\ModelRegistry;
 use AIGateway\Core\GatewayInterface;
 use AIGateway\Core\NormalizedRequest;
 use AIGateway\Core\NormalizedStreamChunk;
@@ -15,7 +14,6 @@ use AIGateway\Exception\GatewayException;
 use AIGateway\Logging\RequestLogger;
 use AIGateway\Metrics\PrometheusMetrics;
 
-use function array_unique;
 use function count;
 
 use const JSON_THROW_ON_ERROR;
@@ -34,7 +32,6 @@ final class ChatController
 {
     public function __construct(
         private readonly GatewayInterface $gateway,
-        private readonly ModelRegistry|null $modelRegistry = null,
         private readonly ConfigStore|null $configStore = null,
         private readonly RequestLogger|null $requestLogger = null,
         private readonly PrometheusMetrics|null $metrics = null,
@@ -64,17 +61,12 @@ final class ChatController
     #[Route('/v1/models', name: 'ai_gateway_models', methods: ['GET'])]
     public function models(): JsonResponse
     {
-        $yamlModels = $this->modelRegistry?->getAvailableModels() ?? [];
         $dbModels = $this->configStore?->listModels() ?? [];
 
-        $dbAliases = array_map(static fn (array $m): string => $m['alias'], $dbModels);
-        $allAliases = array_unique([...$yamlModels, ...$dbAliases]);
-        sort($allAliases);
-
         $data = [];
-        foreach ($allAliases as $alias) {
+        foreach ($dbModels as $model) {
             $data[] = [
-                'id' => $alias,
+                'id' => $model['alias'],
                 'object' => 'model',
                 'owned_by' => 'aigateway',
             ];
@@ -89,12 +81,12 @@ final class ChatController
     #[Route('/v1/health', name: 'ai_gateway_health', methods: ['GET'])]
     public function health(): JsonResponse
     {
-        $models = $this->modelRegistry?->getAvailableModels() ?? [];
+        $dbModels = $this->configStore?->listModels() ?? [];
 
         return new JsonResponse([
             'status' => 'ok',
-            'providers_configured' => count($models) > 0,
-            'models_available' => count($models),
+            'providers_configured' => count($dbModels) > 0,
+            'models_available' => count($dbModels),
         ]);
     }
 
