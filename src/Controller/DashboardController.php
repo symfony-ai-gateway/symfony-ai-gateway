@@ -248,6 +248,7 @@ final class DashboardController
                 overrides: new KeyRules(
                     models: [] !== $selectedModels ? $selectedModels : null,
                     budgetPerDay: '' !== $this->post($request, 'budget_per_day') ? (float) $this->post($request, 'budget_per_day') : null,
+                    rateLimitPerMinute: '' !== $this->post($request, 'rate_limit') ? (int) $this->post($request, 'rate_limit') : null,
                 ),
                 enabled: true,
                 expiresAt: null,
@@ -283,10 +284,22 @@ final class DashboardController
         $today = date('Y-m-d');
         $usage = $this->keyStore?->getKeyUsage($key->id, $today, $today) ?? null;
 
+        $effectiveRules = null !== $team
+            ? $key->resolveRules($team)
+            : ($key->overrides ?? new KeyRules());
+
+        $hasOwnOverrides = false;
+        if (null !== $key->overrides) {
+            $r = $key->overrides;
+            $hasOwnOverrides = null !== $r->budgetPerDay || null !== $r->budgetPerMonth || null !== $r->rateLimitPerMinute || null !== $r->models;
+        }
+
         return new Response($this->twig->render('@AIGateway/dashboard/keys_detail.html.twig', $this->params($request, [
             'key' => $key,
             'team' => $team,
             'usage_today' => $usage,
+            'effective_rules' => $effectiveRules,
+            'has_own_overrides' => $hasOwnOverrides,
         ])));
     }
 
@@ -314,6 +327,7 @@ final class DashboardController
                 overrides: new KeyRules(
                     models: [] !== $selectedModels ? $selectedModels : null,
                     budgetPerDay: '' !== $this->post($request, 'budget_per_day') ? (float) $this->post($request, 'budget_per_day') : null,
+                    rateLimitPerMinute: '' !== $this->post($request, 'rate_limit') ? (int) $this->post($request, 'rate_limit') : null,
                 ),
                 enabled: $key->enabled,
                 expiresAt: $key->expiresAt,
@@ -328,10 +342,12 @@ final class DashboardController
         $teams = $this->keyStore?->listTeams() ?? [];
         $models = $this->configStore?->listModels() ?? [];
         $modelAliases = array_map(static fn ($m): string => $m['alias'], $models);
+        $currentTeam = null !== $key->teamId ? $this->keyStore?->findTeamById($key->teamId) : null;
 
         return new Response($this->twig->render('@AIGateway/dashboard/key_edit.html.twig', $this->params($request, [
             'key' => $key,
             'teams' => $teams,
+            'current_team' => $currentTeam,
             'model_aliases' => $modelAliases,
         ])));
     }

@@ -31,8 +31,11 @@
             <dt><label for="models">Models (comma-separated, empty = all)</label></dt>
             <dd><input type="text" id="models" name="models" placeholder="{{ model_aliases|join(', ') }}" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
 
-            <dt><label for="budget_per_day">Budget / Day (USD, empty = unlimited)</label></dt>
+            <dt><label for="budget_per_day">Budget / Day (USD, empty = inherit from team)</label></dt>
             <dd><input type="number" step="0.01" id="budget_per_day" name="budget_per_day" placeholder="20" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
+
+            <dt><label for="rate_limit">Rate Limit (req/min, empty = inherit from team)</label></dt>
+            <dd><input type="number" id="rate_limit" name="rate_limit" placeholder="60" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
         </div>
 
         <div style="margin-top:24px;display:flex;gap:12px">
