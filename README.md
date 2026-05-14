@@ -140,9 +140,62 @@ final class MyService
 
 You control the routes, auth, and middleware. AIGateway handles the provider communication via Symfony AI.
 
+## Dashboard Protection
+
+The dashboard (`/dashboard/*`) exposes sensitive data: API keys, teams, budgets, usage stats. You have **three options** to protect it:
+
+### Option 1: Symfony Firewall (recommended for existing projects)
+
+If your project already has authentication, put the dashboard behind your firewall:
+
+```yaml
+# config/packages/security.yaml
+security:
+    firewalls:
+        dashboard:
+            pattern: ^/dashboard
+            # your existing auth config...
+```
+
+This is the standard Symfony approach — the dashboard inherits your app's login system, roles, etc.
+
+### Option 2: Dashboard Token (built-in)
+
+For projects without a full auth system, enable the built-in token protection:
+
+```yaml
+# config/packages/ai_gateway.yaml
+ai_gateway:
+    dashboard:
+        auth:
+            enabled: true
+            token: '%env(DASHBOARD_TOKEN)%'
+```
+
+```dotenv
+# .env.local
+DASHBOARD_TOKEN=your-secret-token-here
+```
+
+When enabled, accessing `/dashboard` without a valid token shows a login form. Once authenticated, the token is passed in all links (`?token=...`).
+
+API routes (`/v1/*`) are **not** affected — only the dashboard UI.
+
+### Option 3: Both
+
+You can combine both: the firewall handles the main auth, and the dashboard token adds an extra layer. Or use the firewall for the main app and the token for a separate standalone deployment.
+
+### Disable the dashboard entirely
+
+```yaml
+ai_gateway:
+    dashboard:
+        enabled: false
+```
+
 ## Auth & Teams
 
-Enable auth to require API keys for all requests:
+Enable API key auth to require authentication for all `/v1/*` requests:
 
 ```yaml
 ai_gateway:
@@ -240,6 +293,12 @@ ai_gateway:
     routes:
         enabled: true              # Enable/disable route loading
         prefix: ''                 # Route prefix (e.g. /ai-gateway)
+
+    dashboard:
+        enabled: true              # Show/hide dashboard routes
+        auth:
+            enabled: false         # Enable built-in token protection
+            token: null            # Token string or env var (e.g. '%env(DASHBOARD_TOKEN)%')
 
     providers:
         <name>:

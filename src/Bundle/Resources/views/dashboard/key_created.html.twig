@@ -1,0 +1,29 @@
+{% extends "@AIGateway/dashboard/base.html.twig" %}
+{% import "@AIGateway/dashboard/base.html.twig" as dash %}
+
+{% block title %}AIGateway Dashboard — API Key Created{% endblock %}
+
+{% block content %}
+<h1 class="page-title">API Key Created</h1>
+
+<div class="card" style="border-color:var(--green)">
+    <h3 style="color:var(--green);margin-bottom:16px">Key created successfully!</h3>
+
+    <dl class="def-list">
+        <dt>Name</dt>
+        <dd>{{ key.name }}</dd>
+        <dt>Prefix</dt>
+        <dd class="mono">{{ key.tokenPrefix }}...</dd>
+    </dl>
+
+    <div style="margin-top:24px;padding:16px;background:var(--surface2);border-radius:8px;border:1px solid var(--yellow)">
+        <strong style="color:var(--yellow)">⚠ Save this token — it won't be shown again!</strong>
+        <div style="margin-top:8px;padding:12px;background:var(--bg);border-radius:6px;font-family:monospace;word-break:break-all;color:var(--green);font-size:14px;user-select:all">{{ raw_token }}</div>
+    </div>
+
+    <div style="margin-top:24px;display:flex;gap:12px">
+        <a href="{{ dash.turl('/dashboard/keys', dashboard_token|default('')) }}" class="btn btn-primary">Back to Keys</a>
+        <a href="{{ dash.turl('/dashboard/keys/new', dashboard_token|default('')) }}" class="btn" style="background:var(--surface2)">Create Another</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "@AIGateway/dashboard/base.html.twig" %}
+{% import "@AIGateway/dashboard/base.html.twig" as dash %}
+
+{% block title %}AIGateway Dashboard — New API Key{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Create API Key</h1>
+
+{% if teams|length == 0 %}
+<div class="empty">
+    <h3>Create a team first</h3>
+    <p>You need at least one team before creating API keys.</p>
+    <a href="{{ dash.turl('/dashboard/teams/new', dashboard_token|default('')) }}" class="btn btn-primary" style="margin-top:12px">Create Team</a>
+</div>
+{% else %}
+<div class="card">
+    <form method="POST">
+        <div class="def-list" style="grid-template-columns:160px 1fr;gap:16px">
+            <dt><label for="name">Name</label></dt>
+            <dd><input type="text" id="name" name="name" required placeholder="e.g. Frontend App" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
+
+            <dt><label for="team_id">Team</label></dt>
+            <dd>
+                <select id="team_id" name="team_id" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)">
+                    {% for t in teams %}
+                    <option value="{{ t.id }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </dd>
+
+            <dt><label for="models">Models (comma-separated, empty = all)</label></dt>
+            <dd><input type="text" id="models" name="models" placeholder="{{ model_aliases|join(', ') }}" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
+
+            <dt><label for="budget_per_day">Budget / Day (USD, empty = unlimited)</label></dt>
+            <dd><input type="number" step="0.01" id="budget_per_day" name="budget_per_day" placeholder="20" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
+        </div>
+
+        <div style="margin-top:24px;display:flex;gap:12px">
+            <button type="submit" class="btn btn-primary">Create Key</button>
+            <a href="{{ dash.turl('/dashboard/keys', dashboard_token|default('')) }}" class="btn" style="background:var(--surface2)">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

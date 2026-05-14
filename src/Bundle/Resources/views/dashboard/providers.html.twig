@@ -1,0 +1,49 @@
+{% extends "@AIGateway/dashboard/base.html.twig" %}
+{% import "@AIGateway/dashboard/base.html.twig" as dash %}
+
+{% block title %}AIGateway Dashboard — Providers{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 class="page-title">Providers</h1>
+    <a href="{{ dash.turl('/dashboard/providers/new', dashboard_token|default('')) }}" class="btn btn-primary">+ Add Provider</a>
+</div>
+
+{% if providers|length == 0 %}
+<div class="empty">
+    <h3>No providers configured</h3>
+    <p>Add your first LLM provider to get started.</p>
+</div>
+{% else %}
+<div class="card" style="padding:0;overflow:hidden">
+    <table>
+        <thead>
+            <tr><th>Name</th><th>Format</th><th>Base URL</th><th>Status</th><th>Models</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for p in providers %}
+            <tr>
+                <td><strong>{{ p.name }}</strong></td>
+                <td><span class="badge badge-blue">{{ p.format }}</span></td>
+                <td class="mono" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.base_url ?? 'default' }}</td>
+                <td>
+                    {% if p.enabled %}
+                        <span class="badge badge-green">active</span>
+                    {% else %}
+                        <span class="badge badge-red">disabled</span>
+                    {% endif %}
+                </td>
+                <td>—</td>
+                <td>
+                    <a href="{{ dash.turl('/dashboard/providers/' ~ p.name ~ '/edit', dashboard_token|default('')) }}">edit</a>
+                    <form method="POST" action="{{ dash.turl('/dashboard/providers/' ~ p.name ~ '/delete', dashboard_token|default('')) }}" style="display:inline" onsubmit="return confirm('Delete provider {{ p.name }} and all its models?')">
+                        <button type="submit" class="btn btn-danger" style="padding:2px 8px;font-size:12px">delete</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

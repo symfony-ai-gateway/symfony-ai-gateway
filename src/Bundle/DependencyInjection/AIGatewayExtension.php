@@ -9,10 +9,13 @@ use AIGateway\Auth\AuthEnforcer;
 use AIGateway\Auth\Store\DbalKeyStore;
 use AIGateway\Auth\Store\KeyStoreInterface;
 use AIGateway\Auth\Store\SlidingWindowKeyRateLimiter;
-use AIGateway\Bundle\Routing\AIGatewayRouteLoader;
-use AIGateway\Config\ModelRegistry;
+use AIGateway\Bundle\EventSubscriber\ConfigSchemaInitSubscriber;
 use AIGateway\Bundle\EventSubscriber\DashboardAuthSubscriber;
 use AIGateway\Bundle\EventSubscriber\JsonExceptionSubscriber;
+use AIGateway\Bundle\Routing\AIGatewayRouteLoader;
+use AIGateway\Config\ConfigStore;
+use AIGateway\Config\DynamicProviderFactory;
+use AIGateway\Config\ModelRegistry;
 use AIGateway\Controller\ChatController;
 use AIGateway\Controller\DashboardController;
 use AIGateway\Core\Gateway;
@@ -76,6 +79,7 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
         $this->registerControllers($mergedConfig, $container);
         $this->registerGateway($container);
         $this->registerRouteLoader($mergedConfig, $container);
+        $this->registerConfigStore($container);
         $this->registerEventSubscribers($mergedConfig, $container);
 
         $container
@@ -371,6 +375,8 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
                 '$aliases' => '%ai_gateway.aliases%',
                 '$defaultRetryConfig' => new Reference(RetryConfig::class),
                 '$logger' => new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                '$configStore' => new Reference(ConfigStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                '$dynamicFactory' => new Reference(DynamicProviderFactory::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ]);
 
         if ($container->hasDefinition(AuthEnforcer::class)) {
@@ -436,8 +442,22 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
                 '$twig' => new Reference('twig'),
                 '$keyStore' => $authConfig['enabled'] ?? false ? new Reference(KeyStoreInterface::class) : null,
                 '$requestLogger' => new Reference('AIGateway\Logging\RequestLogger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                '$configStore' => new Reference(ConfigStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ])
             ->addTag('controller.service_arguments');
+    }
+
+    private function registerConfigStore(ContainerBuilder $container): void
+    {
+        $container->register(ConfigStore::class, ConfigStore::class)
+            ->setArguments([
+                '$connection' => new Reference('doctrine.dbal.default_connection', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+            ]);
+
+        $container->register(DynamicProviderFactory::class, DynamicProviderFactory::class)
+            ->setArguments([
+                '$httpClient' => new Reference('http_client'),
+            ]);
     }
 
     /**
@@ -449,6 +469,12 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
         $container->autowire(PrometheusMetrics::class, PrometheusMetrics::class);
 
         $container->register(JsonExceptionSubscriber::class, JsonExceptionSubscriber::class)
+            ->addTag('kernel.event_subscriber');
+
+        $container->register(ConfigSchemaInitSubscriber::class, ConfigSchemaInitSubscriber::class)
+            ->setArguments([
+                '$configStore' => new Reference(ConfigStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
+            ])
             ->addTag('kernel.event_subscriber');
 
         $dashboardConfig = $config['dashboard'] ?? [];

@@ -7,8 +7,11 @@ namespace AIGateway\Core;
 use AIGateway\Auth\ApiKeyContext;
 use AIGateway\Auth\AuthEnforcer;
 use AIGateway\Cache\CacheManager;
+use AIGateway\Config\ConfigStore;
+use AIGateway\Config\DynamicProviderFactory;
 use AIGateway\Config\ModelRegistry;
 use AIGateway\Config\ModelResolution;
+use AIGateway\Config\ModelPricing;
 use AIGateway\Cost\CostTracker;
 use AIGateway\Exception\GatewayException;
 use AIGateway\Logging\RequestLogger;
@@ -31,6 +34,9 @@ final class Gateway implements GatewayInterface
 {
     private LoggerInterface $logger;
 
+    /** @var array<string, ProviderAdapterInterface> */
+    private array $dynamicProviders = [];
+
     /**
      * @param array<string, ProviderAdapterInterface> $providers provider name → adapter
      * @param array<string, list<string>>             $pipelines pipeline name → ordered model aliases
@@ -51,6 +57,8 @@ final class Gateway implements GatewayInterface
         private readonly PrometheusMetrics|null $metrics = null,
         private readonly AuthEnforcer|null $authEnforcer = null,
         LoggerInterface|null $logger = null,
+        private readonly ConfigStore|null $configStore = null,
+        private readonly DynamicProviderFactory|null $dynamicFactory = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
     }
@@ -100,6 +108,9 @@ final class Gateway implements GatewayInterface
             $response = $this->executePipeline($request, $pipelineName);
         } elseif ($this->modelRegistry->has($requestedModel)) {
             $resolution = $this->modelRegistry->resolve($requestedModel);
+            $response = $this->executeSingle($request, $resolution);
+        } elseif ($this->tryResolveDynamic($requestedModel) !== null) {
+            $resolution = $this->tryResolveDynamic($requestedModel);
             $response = $this->executeSingle($request, $resolution);
         } else {
             throw GatewayException::modelNotFound($requestedModel, $this->modelRegistry->getAvailableModels());
@@ -173,11 +184,14 @@ final class Gateway implements GatewayInterface
             user: $request->user,
         );
 
-        if (!$this->modelRegistry->has($streamRequest->model)) {
+        if (!$this->modelRegistry->has($streamRequest->model) && $this->tryResolveDynamic($streamRequest->model) === null) {
             throw GatewayException::modelNotFound($streamRequest->model, $this->modelRegistry->getAvailableModels());
         }
 
-        $resolution = $this->modelRegistry->resolve($streamRequest->model);
+        $resolution = $this->modelRegistry->has($streamRequest->model)
+            ? $this->modelRegistry->resolve($streamRequest->model)
+            : $this->tryResolveDynamic($streamRequest->model)
+                ?? throw GatewayException::modelNotFound($streamRequest->model, []);
         $adapter = $this->getProvider($resolution->provider);
 
         if (null !== $context && null !== $this->authEnforcer) {
@@ -245,11 +259,71 @@ final class Gateway implements GatewayInterface
 
     private function getProvider(string $providerName): ProviderAdapterInterface
     {
-        if (!isset($this->providers[$providerName])) {
-            throw GatewayException::providerNotFound($providerName);
+        if (isset($this->providers[$providerName])) {
+            return $this->providers[$providerName];
         }
 
-        return $this->providers[$providerName];
+        if (isset($this->dynamicProviders[$providerName])) {
+            return $this->dynamicProviders[$providerName];
+        }
+
+        $dynamic = $this->tryCreateDynamicProvider($providerName);
+        if (null !== $dynamic) {
+            return $dynamic;
+        }
+
+        throw GatewayException::providerNotFound($providerName);
+    }
+
+    private function tryResolveDynamic(string $modelAlias): ModelResolution|null
+    {
+        if (null === $this->configStore) {
+            return null;
+        }
+
+        $model = $this->configStore->getModel($modelAlias);
+        if (null === $model) {
+            return null;
+        }
+
+        $this->tryCreateDynamicProvider($model['provider_name']);
+
+        return new ModelResolution(
+            alias: $model['alias'],
+            provider: $model['provider_name'],
+            model: $model['model'],
+            pricing: new ModelPricing(
+                inputPerMillion: $model['pricing_input'],
+                outputPerMillion: $model['pricing_output'],
+            ),
+        );
+    }
+
+    private function tryCreateDynamicProvider(string $providerName): ProviderAdapterInterface|null
+    {
+        if ('' === $providerName || null === $this->configStore || null === $this->dynamicFactory) {
+            return null;
+        }
+
+        if (isset($this->dynamicProviders[$providerName])) {
+            return $this->dynamicProviders[$providerName];
+        }
+
+        $provider = $this->configStore->getProvider($providerName);
+        if (null === $provider) {
+            return null;
+        }
+
+        $adapter = $this->dynamicFactory->createAdapter($providerName, [
+            'format' => $provider['format'],
+            'api_key' => $provider['api_key'],
+            'base_url' => $provider['base_url'],
+            'completions_path' => $provider['completions_path'],
+        ]);
+
+        $this->dynamicProviders[$providerName] = $adapter;
+
+        return $adapter;
     }
 
     private function withModel(NormalizedRequest $request, string $model): NormalizedRequest

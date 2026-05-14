@@ -1,0 +1,46 @@
+{% extends "@AIGateway/dashboard/base.html.twig" %}
+{% import "@AIGateway/dashboard/base.html.twig" as dash %}
+
+{% block title %}AIGateway Dashboard — {{ action == 'new' ? 'New Team' : 'Edit Team' }}{% endblock %}
+
+{% block content %}
+<h1 class="page-title">{{ action == 'new' ? 'Create Team' : 'Edit Team' }}</h1>
+
+<div class="card">
+    <form method="POST">
+        <div class="def-list" style="grid-template-columns:160px 1fr;gap:16px">
+            {% if action == 'new' %}
+            <dt><label for="name">Name</label></dt>
+            <dd><input type="text" id="name" name="name" required placeholder="e.g. Engineering" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
+
+            <dt><label for="parent_id">Parent Team (optional)</label></dt>
+            <dd>
+                <select id="parent_id" name="parent_id" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)">
+                    <option value="">— none (root) —</option>
+                    {% for t in teams %}
+                    <option value="{{ t.id }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </dd>
+            {% endif %}
+
+            <dt><label for="budget_per_day">Budget / Day (USD)</label></dt>
+            <dd><input type="number" step="0.01" id="budget_per_day" name="budget_per_day" value="{{ team.rules.budgetPerDay ?? '' }}" placeholder="100" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
+
+            <dt><label for="budget_per_month">Budget / Month (USD)</label></dt>
+            <dd><input type="number" step="0.01" id="budget_per_month" name="budget_per_month" value="{{ team.rules.budgetPerMonth ?? '' }}" placeholder="2000" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
+
+            <dt><label for="rate_limit">Rate Limit (req/min)</label></dt>
+            <dd><input type="number" id="rate_limit" name="rate_limit" value="{{ team.rules.rateLimitPerMinute ?? '' }}" placeholder="60" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
+
+            <dt><label for="models">Models (comma-separated, empty = all)</label></dt>
+            <dd><input type="text" id="models" name="models" value="{{ team.rules.models is defined and team.rules.models ? team.rules.models|join(',') : '' }}" placeholder="{{ model_aliases|join(', ') }}" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
+        </div>
+
+        <div style="margin-top:24px;display:flex;gap:12px">
+            <button type="submit" class="btn btn-primary">{{ action == 'new' ? 'Create Team' : 'Save Changes' }}</button>
+            <a href="{{ dash.turl('/dashboard/teams', dashboard_token|default('')) }}" class="btn" style="background:var(--surface2)">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
