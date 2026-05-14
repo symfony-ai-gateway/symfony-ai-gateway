@@ -401,7 +401,7 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
         $container->register(SlidingWindowKeyRateLimiter::class, SlidingWindowKeyRateLimiter::class)
             ->setArguments([
                 '$connection' => new Reference('doctrine.dbal.default_connection', ContainerInterface::NULL_ON_INVALID_REFERENCE),
-            ]);;
+            ]);
 
         $container->register(DbalKeyStore::class, DbalKeyStore::class)
             ->setArguments([

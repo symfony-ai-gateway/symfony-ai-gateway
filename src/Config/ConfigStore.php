@@ -6,11 +6,7 @@ namespace AIGateway\Config;
 
 use Doctrine\DBAL\Connection;
 
-use function json_decode;
-use function json_encode;
-
-use const JSON_PRETTY_PRINT;
-use const JSON_THROW_ON_ERROR;
+use function in_array;
 
 final class ConfigStore
 {
@@ -69,7 +65,7 @@ final class ConfigStore
             'SELECT name, format, api_key, base_url, completions_path, enabled FROM gateway_providers ORDER BY name'
         );
 
-        return array_values(array_map(fn (array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'name' => (string) $row['name'],
             'format' => (string) $row['format'],
             'api_key' => (string) $row['api_key'],
@@ -149,7 +145,7 @@ final class ConfigStore
             'SELECT alias, provider_name, model, pricing_input, pricing_output, enabled FROM gateway_models ORDER BY alias'
         );
 
-        return array_values(array_map(fn (array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'alias' => (string) $row['alias'],
             'provider_name' => (string) $row['provider_name'],
             'model' => (string) $row['model'],

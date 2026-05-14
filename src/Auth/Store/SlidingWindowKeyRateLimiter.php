@@ -6,6 +6,7 @@ namespace AIGateway\Auth\Store;
 
 use AIGateway\RateLimit\RateLimitResult;
 use Doctrine\DBAL\Connection;
+use Throwable;
 
 use function time;
 
@@ -30,12 +31,12 @@ final class SlidingWindowKeyRateLimiter
         $windowStart = $now - 60;
 
         $this->connection->executeStatement(
-            "DELETE FROM gateway_rate_limits WHERE key_id = ? AND timestamp < ?",
+            'DELETE FROM gateway_rate_limits WHERE key_id = ? AND timestamp < ?',
             [$keyId, $windowStart],
         );
 
         $count = (int) $this->connection->fetchOne(
-            "SELECT COUNT(*) FROM gateway_rate_limits WHERE key_id = ? AND timestamp >= ?",
+            'SELECT COUNT(*) FROM gateway_rate_limits WHERE key_id = ? AND timestamp >= ?',
             [$keyId, $windowStart],
         );
 
@@ -75,7 +76,7 @@ final class SlidingWindowKeyRateLimiter
             $this->connection->executeStatement('
                 CREATE INDEX IF NOT EXISTS idx_rate_key_ts ON gateway_rate_limits (key_id, timestamp)
             ');
-        } catch (\Throwable) {
+        } catch (Throwable) {
         }
 
         $this->schemaInitialized = true;

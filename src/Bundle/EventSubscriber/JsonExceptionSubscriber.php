@@ -6,13 +6,9 @@ namespace AIGateway\Bundle\EventSubscriber;
 
 use AIGateway\Exception\GatewayException;
 
-use function get_class;
-
 use function is_int;
 
-use function json_encode;
-
-use const JSON_THROW_ON_ERROR;
+use ReflectionClass;
 
 use function sprintf;
 
@@ -60,7 +56,7 @@ final class JsonExceptionSubscriber implements EventSubscriberInterface
             [
                 'error' => [
                     'type' => 'internal_error',
-                    'message' => sprintf('Unexpected %s', (new \ReflectionClass($exception))->getShortName()),
+                    'message' => sprintf('Unexpected %s', (new ReflectionClass($exception))->getShortName()),
                 ],
             ],
             500,

@@ -12,12 +12,16 @@ use AIGateway\Config\ConfigStore;
 use AIGateway\Logging\RequestLogger;
 
 use function count;
-use function time;
+use function is_string;
+use function sprintf;
 
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+
+use function time;
+
 use Twig\Environment;
 
 final class DashboardController
@@ -235,6 +239,26 @@ final class DashboardController
             $selectedModels = array_filter(explode(',', $this->post($request, 'models')));
             $teamId = $this->post($request, 'team_id') ?: null;
 
+            $budgetPerDay = '' !== $this->post($request, 'budget_per_day') ? (float) $this->post($request, 'budget_per_day') : null;
+            $budgetPerMonth = '' !== $this->post($request, 'budget_per_month') ? (float) $this->post($request, 'budget_per_month') : null;
+            $rateLimit = '' !== $this->post($request, 'rate_limit') ? (int) $this->post($request, 'rate_limit') : null;
+
+            $teamForValidation = null;
+            if (null !== $teamId) {
+                $teamForValidation = $this->keyStore?->findTeamById($teamId);
+            }
+            if (null !== $teamForValidation) {
+                $errors = $this->validateKeyOverrides($teamForValidation, $budgetPerDay, $budgetPerMonth, $rateLimit, $selectedModels);
+                if ([] !== $errors) {
+                    return new Response($this->twig->render('@AIGateway/dashboard/key_form.html.twig', $this->params($request, [
+                        'teams' => $teams,
+                        'model_aliases' => $modelAliases,
+                        'errors' => $errors,
+                        'submitted' => ['name' => $this->post($request, 'name'), 'team_id' => $teamId, 'models' => $this->post($request, 'models'), 'budget_per_day' => $this->post($request, 'budget_per_day'), 'budget_per_month' => $this->post($request, 'budget_per_month'), 'rate_limit' => $this->post($request, 'rate_limit')],
+                    ])), 422);
+                }
+            }
+
             $rawToken = 'aigw_'.bin2hex(random_bytes(24));
             $tokenHash = hash('sha256', $rawToken);
             $prefix = substr($rawToken, 0, 8);
@@ -247,8 +271,9 @@ final class DashboardController
                 teamId: $teamId,
                 overrides: new KeyRules(
                     models: [] !== $selectedModels ? $selectedModels : null,
-                    budgetPerDay: '' !== $this->post($request, 'budget_per_day') ? (float) $this->post($request, 'budget_per_day') : null,
-                    rateLimitPerMinute: '' !== $this->post($request, 'rate_limit') ? (int) $this->post($request, 'rate_limit') : null,
+                    budgetPerDay: $budgetPerDay,
+                    budgetPerMonth: $budgetPerMonth,
+                    rateLimitPerMinute: $rateLimit,
                 ),
                 enabled: true,
                 expiresAt: null,
@@ -318,6 +343,30 @@ final class DashboardController
             $selectedModels = array_filter(explode(',', $this->post($request, 'models')));
             $teamId = $this->post($request, 'team_id') ?: null;
 
+            $budgetPerDay = '' !== $this->post($request, 'budget_per_day') ? (float) $this->post($request, 'budget_per_day') : null;
+            $budgetPerMonth = '' !== $this->post($request, 'budget_per_month') ? (float) $this->post($request, 'budget_per_month') : null;
+            $rateLimit = '' !== $this->post($request, 'rate_limit') ? (int) $this->post($request, 'rate_limit') : null;
+
+            $teamForValidation = null;
+            if (null !== $teamId) {
+                $teamForValidation = $this->keyStore?->findTeamById($teamId);
+            }
+            if (null !== $teamForValidation) {
+                $errors = $this->validateKeyOverrides($teamForValidation, $budgetPerDay, $budgetPerMonth, $rateLimit, $selectedModels);
+                if ([] !== $errors) {
+                    $allTeams = $this->keyStore?->listTeams() ?? [];
+                    $models = $this->configStore?->listModels() ?? [];
+
+                    return new Response($this->twig->render('@AIGateway/dashboard/key_edit.html.twig', $this->params($request, [
+                        'key' => $key,
+                        'teams' => $allTeams,
+                        'current_team' => $teamForValidation,
+                        'model_aliases' => array_map(static fn ($m): string => $m['alias'], $models),
+                        'errors' => $errors,
+                    ])), 422);
+                }
+            }
+
             $updated = new ApiKey(
                 id: $key->id,
                 name: $this->post($request, 'name', $key->name),
@@ -326,8 +375,9 @@ final class DashboardController
                 teamId: $teamId,
                 overrides: new KeyRules(
                     models: [] !== $selectedModels ? $selectedModels : null,
-                    budgetPerDay: '' !== $this->post($request, 'budget_per_day') ? (float) $this->post($request, 'budget_per_day') : null,
-                    rateLimitPerMinute: '' !== $this->post($request, 'rate_limit') ? (int) $this->post($request, 'rate_limit') : null,
+                    budgetPerDay: $budgetPerDay,
+                    budgetPerMonth: $budgetPerMonth,
+                    rateLimitPerMinute: $rateLimit,
                 ),
                 enabled: $key->enabled,
                 expiresAt: $key->expiresAt,
@@ -550,5 +600,38 @@ final class DashboardController
         $value = $request->request->get($key, $default);
 
         return is_string($value) ? $value : $default;
+    }
+
+    /**
+     * Validates that key overrides don't exceed team limits.
+     *
+     * @param list<string> $selectedModels
+     *
+     * @return list<string> List of validation error messages
+     */
+    private function validateKeyOverrides(Team $team, float|null $budgetPerDay, float|null $budgetPerMonth, int|null $rateLimit, array $selectedModels): array
+    {
+        $errors = [];
+
+        if (null !== $budgetPerDay && null !== $team->rules->budgetPerDay && $budgetPerDay > $team->rules->budgetPerDay) {
+            $errors[] = sprintf('Budget/day ($%.2f) exceeds team limit ($%.02f).', $budgetPerDay, $team->rules->budgetPerDay);
+        }
+
+        if (null !== $budgetPerMonth && null !== $team->rules->budgetPerMonth && $budgetPerMonth > $team->rules->budgetPerMonth) {
+            $errors[] = sprintf('Budget/month ($%.2f) exceeds team limit ($%.02f).', $budgetPerMonth, $team->rules->budgetPerMonth);
+        }
+
+        if (null !== $rateLimit && null !== $team->rules->rateLimitPerMinute && $rateLimit > $team->rules->rateLimitPerMinute) {
+            $errors[] = sprintf('Rate limit (%d req/min) exceeds team limit (%d req/min).', $rateLimit, $team->rules->rateLimitPerMinute);
+        }
+
+        if ([] !== $selectedModels && null !== $team->rules->models) {
+            $invalid = array_diff($selectedModels, $team->rules->models);
+            if ([] !== $invalid) {
+                $errors[] = sprintf('Models not allowed by team: %s. Team allows: %s', implode(', ', $invalid), implode(', ', $team->rules->models));
+            }
+        }
+
+        return $errors;
     }
 }

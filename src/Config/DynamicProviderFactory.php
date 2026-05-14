@@ -20,7 +20,7 @@ final class DynamicProviderFactory
      * @param array{format: string, api_key: string, base_url: string|null, completions_path: string} $config
      */
     /**
-     * @param non-empty-string $name
+     * @param non-empty-string                                                                        $name
      * @param array{format: string, api_key: string, base_url: string|null, completions_path: string} $config
      */
     public function createAdapter(string $name, array $config): SymfonyAiProviderAdapter

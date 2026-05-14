@@ -9,9 +9,9 @@ use AIGateway\Auth\AuthEnforcer;
 use AIGateway\Cache\CacheManager;
 use AIGateway\Config\ConfigStore;
 use AIGateway\Config\DynamicProviderFactory;
+use AIGateway\Config\ModelPricing;
 use AIGateway\Config\ModelRegistry;
 use AIGateway\Config\ModelResolution;
-use AIGateway\Config\ModelPricing;
 use AIGateway\Cost\CostTracker;
 use AIGateway\Exception\GatewayException;
 use AIGateway\Logging\RequestLogger;
@@ -109,7 +109,7 @@ final class Gateway implements GatewayInterface
         } elseif ($this->modelRegistry->has($requestedModel)) {
             $resolution = $this->modelRegistry->resolve($requestedModel);
             $response = $this->executeSingle($request, $resolution);
-        } elseif ($this->tryResolveDynamic($requestedModel) !== null) {
+        } elseif (null !== $this->tryResolveDynamic($requestedModel)) {
             $resolution = $this->tryResolveDynamic($requestedModel);
             $response = $this->executeSingle($request, $resolution);
         } else {
@@ -184,7 +184,7 @@ final class Gateway implements GatewayInterface
             user: $request->user,
         );
 
-        if (!$this->modelRegistry->has($streamRequest->model) && $this->tryResolveDynamic($streamRequest->model) === null) {
+        if (!$this->modelRegistry->has($streamRequest->model) && null === $this->tryResolveDynamic($streamRequest->model)) {
             throw GatewayException::modelNotFound($streamRequest->model, $this->modelRegistry->getAvailableModels());
         }
 
