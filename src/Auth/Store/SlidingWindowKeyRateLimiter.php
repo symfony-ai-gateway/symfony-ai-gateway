@@ -5,34 +5,38 @@ declare(strict_types=1);
 namespace AIGateway\Auth\Store;
 
 use AIGateway\RateLimit\RateLimitResult;
+use Doctrine\DBAL\Connection;
 
-use function count;
 use function time;
 
 final class SlidingWindowKeyRateLimiter
 {
-    /** @var array<string, list<int>> */
-    private array $windows = [];
+    private bool $schemaInitialized = false;
+
+    public function __construct(
+        private readonly Connection $connection,
+    ) {
+    }
 
     public function isAllowed(string $keyId, int $maxPerMinute): RateLimitResult
     {
+        $this->ensureSchema();
+
         $now = time();
         $windowStart = $now - 60;
 
-        if (!isset($this->windows[$keyId])) {
-            $this->windows[$keyId] = [];
-        }
+        $this->connection->executeStatement(
+            "DELETE FROM gateway_rate_limits WHERE key_id = ? AND timestamp < ?",
+            [$keyId, $windowStart],
+        );
 
-        $this->windows[$keyId] = array_values(array_filter(
-            $this->windows[$keyId],
-            static fn (int $timestamp): bool => $timestamp > $windowStart,
-        ));
-
-        $count = count($this->windows[$keyId]);
-        $allowed = $count < $maxPerMinute;
+        $count = (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM gateway_rate_limits WHERE key_id = ? AND timestamp >= ?",
+            [$keyId, $windowStart],
+        );
 
         return new RateLimitResult(
-            allowed: $allowed,
+            allowed: $count < $maxPerMinute,
             limit: $maxPerMinute,
             remaining: max(0, $maxPerMinute - $count),
             resetAt: $now + 60,
@@ -41,10 +45,34 @@ final class SlidingWindowKeyRateLimiter
 
     public function increment(string $keyId): void
     {
-        if (!isset($this->windows[$keyId])) {
-            $this->windows[$keyId] = [];
+        $this->ensureSchema();
+
+        $this->connection->insert('gateway_rate_limits', [
+            'key_id' => $keyId,
+            'timestamp' => time(),
+        ]);
+    }
+
+    private function ensureSchema(): void
+    {
+        if ($this->schemaInitialized) {
+            return;
         }
 
-        $this->windows[$keyId][] = time();
+        $schemaManager = $this->connection->createSchemaManager();
+        $schema = $schemaManager->introspectSchema();
+
+        if (!$schema->hasTable('gateway_rate_limits')) {
+            $table = $schema->createTable('gateway_rate_limits');
+            $table->addColumn('id', 'integer', ['autoincrement' => true]);
+            $table->addColumn('key_id', 'string', ['length' => 64, 'notnull' => true]);
+            $table->addColumn('timestamp', 'integer', ['notnull' => true]);
+            $table->setPrimaryKey(['id']);
+            $table->addIndex(['key_id', 'timestamp'], 'idx_rate_key_ts');
+
+            $schemaManager->createTable($table);
+        }
+
+        $this->schemaInitialized = true;
     }
 }
