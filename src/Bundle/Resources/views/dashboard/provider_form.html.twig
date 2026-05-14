@@ -17,10 +17,11 @@
             <dt><label for="format">Format</label></dt>
             <dd>
                 <select id="format" name="format" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)">
-                    <option value="openai" {{ provider.format == 'openai' ? 'selected' : '' }}>openai (OpenAI-compatible)</option>
-                    <option value="anthropic" {{ provider.format == 'anthropic' ? 'selected' : '' }}>anthropic</option>
-                    <option value="gemini" {{ provider.format == 'gemini' ? 'selected' : '' }}>gemini</option>
-                    <option value="ollama" {{ provider.format == 'ollama' ? 'selected' : '' }}>ollama</option>
+                    {% set current_format = provider.format ?? 'openai' %}
+                    <option value="openai" {{ current_format == 'openai' ? 'selected' : '' }}>openai (OpenAI-compatible)</option>
+                    <option value="anthropic" {{ current_format == 'anthropic' ? 'selected' : '' }}>anthropic</option>
+                    <option value="gemini" {{ current_format == 'gemini' ? 'selected' : '' }}>gemini</option>
+                    <option value="ollama" {{ current_format == 'ollama' ? 'selected' : '' }}>ollama</option>
                 </select>
             </dd>
 
