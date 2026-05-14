@@ -8,7 +8,7 @@
 
 Every project that calls LLMs reinvents the same plumbing: provider SDKs, API key management, retry logic, cost tracking, budget limits. AIGateway bundles all of this into one Symfony package powered by the **official Symfony AI** library.
 
-**One `composer require`, one config file, all models.**
+**One `composer require`, all models.**
 
 ## What it does
 
@@ -23,6 +23,7 @@ Every project that calls LLMs reinvents the same plumbing: provider SDKs, API ke
 - **Streaming SSE** — Server-sent events for chat completions
 - **Prometheus metrics** — `ai_gateway_requests_total`, `ai_gateway_cost_dollars_total`, etc.
 - **Web dashboard** — Dark-themed UI at `/dashboard` with Chart.js analytics
+- **CLI management** — Full provider, model, key, and team management from the command line
 - **Route prefix** — Optional `routes.prefix` to mount under `/ai-gateway/` or any prefix
 
 ## Install
@@ -45,47 +46,24 @@ return [
 ```yaml
 # config/packages/ai_gateway.yaml
 ai_gateway:
-    providers:
-        openai:
-            format: openai
-            api_key: '%env(OPENAI_API_KEY)%'
-        anthropic:
-            format: anthropic
-            api_key: '%env(ANTHROPIC_API_KEY)%'
-        ollama:
-            format: ollama
-            base_url: 'http://localhost:11434'
-        # Any OpenAI-compatible provider
-        deepseek:
-            format: openai
-            api_key: '%env(DEEPSEEK_API_KEY)%'
-            base_url: 'https://api.deepseek.com'
-
-    models:
-        gpt_4o:
-            provider: openai
-            model: gpt-4o
-            pricing: { input: 2.50, output: 10.00 }
-        claude_sonnet:
-            provider: anthropic
-            model: claude-sonnet-4-20250514
-            pricing: { input: 3.00, output: 15.00 }
-        local_llama:
-            provider: ollama
-            model: llama3
-            pricing: { input: 0.0, output: 0.0 }
-        deepseek_chat:
-            provider: deepseek
-            model: deepseek-chat
-            pricing: { input: 0.27, output: 1.10 }
+    # Everything is managed via the dashboard or CLI.
+    # See "CLI Commands" and "Dashboard" sections below.
 
     aliases:
         smart: gpt_4o
         fast: deepseek_chat
 
-    auth:
-        enabled: false
+    dashboard:
+        tokenRequired: true
+        token: '%env(DASHBOARD_TOKEN)%'
 ```
+
+```dotenv
+# .env.local
+DASHBOOT_TOKEN=your-secret-token-here
+```
+
+> **Providers and models** are stored in the database and managed via the dashboard or CLI. No YAML editing required after initial setup.
 
 ## Load routes
 
@@ -103,9 +81,10 @@ All routes are now available: `/v1/chat/completions`, `/v1/models`, `/v1/health`
 
 ```yaml
 ai_gateway:
-    providers: { ... }
     routes:
         prefix: /ai-gateway
+    dashboard:
+        token: '%env(DASHBOARD_TOKEN)%'
 ```
 
 Routes become `/ai-gateway/v1/chat/completions`, `/ai-gateway/dashboard`, etc.
@@ -167,9 +146,8 @@ For projects without a full auth system, enable the built-in token protection:
 # config/packages/ai_gateway.yaml
 ai_gateway:
     dashboard:
-        auth:
-            enabled: true
-            token: '%env(DASHBOARD_TOKEN)%'
+        tokenRequired: true
+        token: '%env(DASHBOARD_TOKEN)%'
 ```
 
 ```dotenv
@@ -221,48 +199,134 @@ Create model aliases at `/dashboard/models` that map to a provider's model ID:
 | **Input Price** | Cost per million input tokens (USD) |
 | **Output Price** | Cost per million output tokens (USD) |
 
-### Runtime Resolution
-
-The gateway resolves models in this order:
-
-1. **YAML config** (compile-time) — providers and models from `ai_gateway.yaml`
-2. **Database config** (runtime) — providers and models created via dashboard
-
-This means you can start with YAML for seed config, then add new providers/models from the dashboard without redeploying.
-
 ### Keys & Teams
 
 Create API keys and teams from `/dashboard/keys/new` and `/dashboard/teams/new`. See the [Auth & Teams](#auth--teams) section for the hierarchy model.
 
-## Auth & Teams
+## CLI Commands
 
-Enable API key auth to require authentication for all `/v1/*` requests:
+All management can be done via CLI — ideal for automation, CI/CD, or headless setups.
 
-```yaml
-ai_gateway:
-    auth:
-        enabled: true
-        required: true
-```
-
-### CLI — Create a Team
+### Provider commands
 
 ```bash
-php bin/console ai-gateway:team:create \
+# Create a provider
+php bin/console provider:create \
+    --name openai \
+    --format openai \
+    --api-key 'sk-...'
+
+# Custom endpoint (OpenAI-compatible)
+php bin/console provider:create \
+    --name deepseek \
+    --format openai \
+    --api-key 'sk-...' \
+    --base-url 'https://api.deepseek.com'
+
+# Anthropic
+php bin/console provider:create \
+    --name anthropic \
+    --format anthropic \
+    --api-key 'sk-ant-...'
+
+# Ollama (local)
+php bin/console provider:create \
+    --name ollama \
+    --format ollama \
+    --base-url 'http://localhost:11434'
+
+# List providers
+php bin/console provider:list
+
+# Delete a provider (removes its models too)
+php bin/console provider:delete openai
+```
+
+### Model commands
+
+```bash
+# Create a model
+php bin/console model:create \
+    --alias gpt_4o \
+    --provider openai \
+    --model gpt-4o \
+    --pricing-input 2.50 \
+    --pricing-output 10.00
+
+# List models
+php bin/console model:list
+
+# Delete a model
+php bin/console model:delete gpt_4o
+```
+
+### Team commands
+
+```bash
+# Create a team
+php bin/console team:create \
     --name "Engineering" \
     --budget-per-day 100 \
+    --budget-per-month 2000 \
+    --rate-limit 60 \
     --models "gpt_4o,claude_sonnet"
+
+# List teams
+php bin/console team:list
+
+# Show team details
+php bin/console team:info <team-id>
 ```
 
-### CLI — Create an API Key
+### API Key commands
 
 ```bash
-php bin/console ai-gateway:key:create \
+# Create a key
+php bin/console key:create \
     --name "Frontend App" \
     --team <team-id> \
     --budget-per-day 20 \
-    --models "gpt_4o"
+    --budget-per-month 400 \
+    --rate-limit 30 \
+    --models "gpt_4o" \
+    --expires 1767225600
+
+# List keys
+php bin/console key:list
+
+# Show key details
+php bin/console key:info <key-id>
+
+# Revoke a key
+php bin/console key:revoke <key-id>
 ```
+
+### Stats
+
+```bash
+php bin/console stats
+```
+
+| Command | Description |
+|---------|-------------|
+| `provider:create` | Create a provider (openai, anthropic, gemini, ollama, azure) |
+| `provider:list` | List all providers |
+| `provider:delete` | Delete a provider and its models |
+| `model:create` | Create a model alias |
+| `model:list` | List all models |
+| `model:delete` | Delete a model alias |
+| `key:create` | Create an API key with optional overrides |
+| `key:list` | List all API keys |
+| `key:info` | Show key details + usage |
+| `key:revoke` | Disable an API key |
+| `team:create` | Create a team with rules |
+| `team:list` | List all teams |
+| `team:info` | Show team details + keys |
+| `stats` | Show gateway usage statistics |
+
+## Auth & Teams
+
+API key authentication is **always enabled**. Every request to `/v1/*` must include a valid `Authorization: Bearer <key>` header. This ensures all usage is tracked and billable.
 
 ### Hierarchy
 
@@ -274,31 +338,26 @@ Team "Engineering" ($100/day, gpt_4o + claude_sonnet)
   └── Key "CI Bot" ($5/day, claude_sonnet only, 10 req/min)
 ```
 
+Keys without a team have their own independent limits.
+
+### Key override validation
+
+When a key belongs to a team, its overrides are validated against the team's limits at creation and edit time:
+- Budget/day must be ≤ team limit
+- Budget/month must be ≤ team limit
+- Rate limit must be ≤ team limit
+- Model whitelist must be a subset of the team's allowed models
+
 ## Supported Providers
 
 | Provider | Format | Notes |
 |----------|--------|-------|
-| **OpenAI** | `openai` | Native Symfony AI bridge |
+| **OpenAI** | `openai` | Native or custom base URL |
 | **Anthropic** | `anthropic` | Claude models |
 | **Google Gemini** | `gemini` | Gemini Pro, Flash |
 | **Ollama** | `ollama` | Local models |
 | **Azure OpenAI** | `azure` | Enterprise Azure |
 | **Any OpenAI-compatible** | `openai` + `base_url` | DeepSeek, Groq, OpenRouter, Mistral... |
-
-### Custom Provider Example
-
-```yaml
-ai_gateway:
-    providers:
-        groq:
-            format: openai
-            api_key: '%env(GROQ_API_KEY)%'
-            base_url: 'https://api.groq.com/openai/v1'
-        openrouter:
-            format: openai
-            api_key: '%env(OPENROUTER_API_KEY)%'
-            base_url: 'https://openrouter.ai/api/v1'
-```
 
 ## API Endpoints
 
@@ -321,24 +380,13 @@ ai_gateway:
 | `GET` | `/dashboard/keys` | List API keys |
 | `GET/POST` | `/dashboard/keys/new` | Create an API key |
 | `GET` | `/dashboard/keys/{id}` | Key details + usage |
+| `GET/POST` | `/dashboard/keys/{id}/edit` | Edit key overrides + team |
 | `POST` | `/dashboard/keys/{id}/revoke` | Revoke an API key |
 | `GET` | `/dashboard/teams` | List teams |
 | `GET/POST` | `/dashboard/teams/new` | Create a team |
+| `GET/POST` | `/dashboard/teams/{id}/edit` | Edit a team |
 | `GET` | `/dashboard/teams/{id}` | Team details + keys |
 | `GET` | `/dashboard/analytics` | Charts and analytics |
-
-## CLI Commands
-
-| Command | Description |
-|---------|-------------|
-| `ai-gateway:key:create` | Create an API key with optional overrides |
-| `ai-gateway:key:list` | List all API keys |
-| `ai-gateway:key:info <id>` | Show key details + usage |
-| `ai-gateway:key:revoke <id>` | Disable an API key |
-| `ai-gateway:team:create` | Create a team with rules |
-| `ai-gateway:team:list` | List all teams |
-| `ai-gateway:team:info <id>` | Show team details + keys |
-| `ai-gateway:stats` | Show gateway usage statistics |
 
 ## Configuration Reference
 
@@ -350,55 +398,37 @@ ai_gateway:
 
     dashboard:
         enabled: true              # Show/hide dashboard routes
-        auth:
-            enabled: false         # Enable built-in token protection
-            token: null            # Token string or env var (e.g. '%env(DASHBOARD_TOKEN)%')
+        tokenRequired: false       # Require token to access dashboard
+        token: null                # Token string or env var (e.g. '%env(DASHBOARD_TOKEN)%')
 
-    providers:
-        <name>:
-            format: openai|anthropic|gemini|ollama|azure
-            api_key: string
-            base_url: string|null  # Required for ollama, azure, and custom providers
-            completions_path: '/v1/chat/completions'
-            streaming: true
-            vision: false
-            function_calling: true
-            max_tokens_per_request: 128000
-
-    models:
-        <alias>:
-            provider: string
-            model: string
-            pricing: { input: float, output: float }
-            max_tokens: 128000
-
-    pipelines:
-        <name>:
-            models: [model1, model2, ...]
-
+    # Optional: static routing aliases
     aliases:
         <alias>: <model-alias>
         <alias>: 'pipeline:<name>'
 
+    # Optional: fallback pipelines
+    pipelines:
+        <name>:
+            models: [model1, model2, ...]
+
+    # Optional: retry configuration
     retry:
         max_attempts: 2
         delay_ms: 1000
         backoff: fixed|exponential
-
-    auth:
-        enabled: false
-        required: true
 ```
+
+> **Note:** `providers` and `models` are no longer configured in YAML. They are stored in the database and managed via the dashboard or CLI commands (`provider:create`, `model:create`, etc.).
 
 ## Want a standalone server?
 
-If you just want to run AIGateway as a dedicated server without integrating it into an existing project, check out **[symfony-ai-gateway-standalone](https://github.com/symfony-ai-gateway/symfony-ai-gateway-standalone)** — a pre-configured Symfony project with Docker, auth setup script, and ready-to-run config.
+If you just want to run AIGateway as a dedicated server without integrating it into an existing project, check out **[symfony-ai-gateway-standalone](https://github.com/symfony-ai-gateway/symfony-ai-gateway-standalone)** — a pre-configured Symfony project with Docker and ready-to-run config.
 
 ## Requirements
 
 - PHP >= 8.2
 - Symfony ^7.0 || ^8.0
-- Doctrine DBAL ^4.4 (for auth storage, SQLite or any DBAL-supported DB)
+- Doctrine DBAL ^4.4 (for auth/rate-limit storage, SQLite or any DBAL-supported DB)
 
 ## License
 

@@ -16,8 +16,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand(name: 'model:list', description: 'List all configured models')]
-final class ModelListCommand extends Command
+#[AsCommand(name: 'provider:list', description: 'List all configured providers')]
+final class ProviderListCommand extends Command
 {
     public function __construct(
         private readonly ConfigStore $configStore,
@@ -28,28 +28,28 @@ final class ModelListCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $models = $this->configStore->listModels();
+        $providers = $this->configStore->listProviders();
 
-        if ([] === $models) {
-            $io->note('No models configured.');
+        if ([] === $providers) {
+            $io->note('No providers configured.');
 
             return Command::SUCCESS;
         }
 
-        $io->title('Models');
+        $io->title('Providers');
 
         $io->table(
-            ['Alias', 'Provider', 'Model', 'Pricing (in/out per 1M tok)', 'Enabled'],
-            array_map(static fn (array $m): array => [
-                $m['alias'],
-                $m['provider_name'],
-                $m['model'],
-                sprintf('$%.2f / $%.2f', $m['pricing_input'], $m['pricing_output']),
-                $m['enabled'] ? 'yes' : 'no',
-            ], $models),
+            ['Name', 'Format', 'Base URL', 'Completions Path', 'Enabled'],
+            array_map(static fn (array $p): array => [
+                $p['name'],
+                $p['format'],
+                $p['base_url'] ?? '(default)',
+                $p['completions_path'],
+                $p['enabled'] ? 'yes' : 'no',
+            ], $providers),
         );
 
-        $io->note(sprintf('Total: %d model(s)', count($models)));
+        $io->note(sprintf('Total: %d provider(s)', count($providers)));
 
         return Command::SUCCESS;
     }
