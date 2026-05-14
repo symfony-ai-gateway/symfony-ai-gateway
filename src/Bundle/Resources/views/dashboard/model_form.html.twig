@@ -17,8 +17,9 @@
             <dt><label for="provider_name">Provider</label></dt>
             <dd>
                 <select id="provider_name" name="provider_name" required style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)">
+                    {% set current_provider = model.provider_name ?? '' %}
                     {% for p in providers %}
-                    <option value="{{ p.name }}" {{ model.provider_name == p.name ? 'selected' : '' }}>{{ p.name }}</option>
+                    <option value="{{ p.name }}" {{ current_provider == p.name ? 'selected' : '' }}>{{ p.name }}</option>
                     {% endfor %}
                 </select>
             </dd>

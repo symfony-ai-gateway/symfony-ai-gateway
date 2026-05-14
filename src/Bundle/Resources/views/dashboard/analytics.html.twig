@@ -77,7 +77,7 @@ new Chart(document.getElementById('chartProvider'), {
     data: {
         labels: {{ by_provider|keys|json_encode|raw }},
         datasets: [{
-            data: {{ by_provider|values|json_encode|raw }},
+            data: {{ by_provider|map(v => v)|json_encode|raw }},
             backgroundColor: ['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899']
         }]
     },
@@ -94,7 +94,7 @@ new Chart(document.getElementById('chartModelCost'), {
         labels: {{ by_model|keys|json_encode|raw }},
         datasets: [{
             label: 'Cost (USD)',
-            data: {{ by_model|values|map(v => v.cost)|json_encode|raw }},
+            data: {{ by_model|map(v => v.cost)|json_encode|raw }},
             backgroundColor: '#6366f1'
         }]
     },
