@@ -23,9 +23,9 @@
         <tbody>
         {% for m in models %}
             <tr>
-                <td><strong>{{ m.alias }}</strong></td>
+                <td><a href="{{ dash.turl('/dashboard/models/' ~ m.alias, dashboard_token|default('')) }}"><strong>{{ m.alias }}</strong></a></td>
                 <td class="mono">{{ m.model }}</td>
-                <td>{{ provider_names[m.provider_name] ?? m.provider_name }}</td>
+                <td><a href="{{ dash.turl('/dashboard/providers/' ~ m.provider_name, dashboard_token|default('')) }}">{{ provider_names[m.provider_name] ?? m.provider_name }}</a></td>
                 <td>${{ m.pricing_input|number_format(2) }}</td>
                 <td>${{ m.pricing_output|number_format(2) }}</td>
                 <td>
@@ -36,8 +36,9 @@
                     {% endif %}
                 </td>
                 <td>
-                    <a href="{{ dash.turl('/dashboard/models/' ~ m.alias ~ '/edit', dashboard_token|default('')) }}">edit</a>
-                    <form method="POST" action="{{ dash.turl('/dashboard/models/' ~ m.alias ~ '/delete', dashboard_token|default('')) }}" style="display:inline" onsubmit="return confirm('Delete model {{ m.alias }}?')">
+                    <a href="{{ dash.turl('/dashboard/models/' ~ m.alias, dashboard_token|default('')) }}">stats</a>
+                    <a href="{{ dash.turl('/dashboard/models/' ~ m.alias ~ '/edit', dashboard_token|default('')) }}" style="margin-left:8px">edit</a>
+                    <form method="POST" action="{{ dash.turl('/dashboard/models/' ~ m.alias ~ '/delete', dashboard_token|default('')) }}" style="display:inline;margin-left:8px" onsubmit="return confirm('Delete model {{ m.alias }}?')">
                         <button type="submit" class="btn btn-danger" style="padding:2px 8px;font-size:12px">delete</button>
                     </form>
                 </td>

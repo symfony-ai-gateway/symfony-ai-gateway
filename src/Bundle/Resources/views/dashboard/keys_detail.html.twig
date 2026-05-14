@@ -43,6 +43,13 @@
     </div>
 </div>
 
+<div class="section">
+    <h2>Usage Over Time (30 days)</h2>
+    <div class="card">
+        <canvas id="chartDaily" height="100"></canvas>
+    </div>
+</div>
+
 <div class="grid grid-2">
     <div class="card">
         <h3>Details</h3>
@@ -76,8 +83,34 @@
         {% else %}
         <p style="color:var(--text2)">No usage recorded today.</p>
         {% endif %}
+        {% if team and team_stats is defined and team_stats %}
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+            <span style="color:var(--text2);font-size:12px">Share of team cost</span>
+            <div style="font-size:24px;font-weight:700;color:var(--accent2)">{{ key_share_pct|number_format(1) }}%</div>
+            <a href="{{ dash.turl('/dashboard/teams/' ~ team.id, dashboard_token|default('')) }}" style="font-size:12px">View team →</a>
+        </div>
+        {% endif %}
     </div>
 </div>
+
+{% if providers|length > 0 %}
+<div class="section">
+    <h2>Providers Used</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>Provider</th><th>Cost</th></tr></thead>
+            <tbody>
+            {% for prov, cost in providers %}
+            <tr>
+                <td><a href="{{ dash.turl('/dashboard/providers/' ~ prov, dashboard_token|default('')) }}"><strong>{{ prov }}</strong></a></td>
+                <td style="color:var(--yellow)">${{ cost|number_format(4) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
 
 {% if model_breakdown|length > 0 %}
 <div class="section">
@@ -88,7 +121,7 @@
             <tbody>
             {% for m in model_breakdown %}
             <tr>
-                <td><strong>{{ m.model_alias }}</strong></td>
+                <td><a href="{{ dash.turl('/dashboard/models/' ~ m.model_alias, dashboard_token|default('')) }}"><strong>{{ m.model_alias }}</strong></a></td>
                 <td>{{ m.requests|number_format }}</td>
                 <td>{{ m.tokens|number_format }}</td>
                 <td style="color:var(--yellow)">${{ m.cost|number_format(4) }}</td>
@@ -112,8 +145,8 @@
             {% for log in recent_logs %}
             <tr>
                 <td class="mono" style="font-size:12px">{{ log.created_at|date('Y-m-d H:i') }}</td>
-                <td>{{ log.model_alias }}</td>
-                <td>{{ log.provider }}</td>
+                <td><a href="{{ dash.turl('/dashboard/models/' ~ log.model_alias, dashboard_token|default('')) }}">{{ log.model_alias }}</a></td>
+                <td><a href="{{ dash.turl('/dashboard/providers/' ~ log.provider, dashboard_token|default('')) }}">{{ log.provider }}</a></td>
                 <td>{{ log.total_tokens|number_format }} <span style="color:var(--text2);font-size:12px">({{ log.prompt_tokens }}↑ {{ log.completion_tokens }}↓)</span></td>
                 <td style="color:var(--yellow)">${{ log.cost_usd|number_format(6) }}</td>
                 <td>{{ log.duration_ms|number_format(1) }}ms</td>
@@ -210,5 +243,37 @@
         </div>
     </div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if key_daily_usage|length > 0 %}
+<script>
+new Chart(document.getElementById('chartDaily'), {
+    type: 'bar',
+    data: {
+        labels: {{ key_daily_usage|map(d => d.date)|json_encode|raw }},
+        datasets: [{
+            label: 'Requests',
+            data: {{ key_daily_usage|map(d => d.requests)|json_encode|raw }},
+            backgroundColor: '#6366f1',
+            yAxisID: 'y'
+        }, {
+            label: 'Tokens',
+            data: {{ key_daily_usage|map(d => d.tokens)|json_encode|raw }},
+            backgroundColor: '#22c55e',
+            yAxisID: 'y1'
+        }]
+    },
+    options: {
+        plugins: { legend: { labels: { color: '#e4e6f0' } } },
+        scales: {
+            x: { ticks: { color: '#8b90a8', maxTicksLimit: 10 }, grid: { color: '#2e3348' } },
+            y: { ticks: { color: '#8b90a8' }, grid: { color: '#2e3348' }, position: 'left' },
+            y1: { ticks: { color: '#22c55e' }, grid: { display: false }, position: 'right' }
+        }
+    }
+});
+</script>
 {% endif %}
 {% endblock %}

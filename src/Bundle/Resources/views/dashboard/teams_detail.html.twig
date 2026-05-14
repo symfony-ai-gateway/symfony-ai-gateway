@@ -33,9 +33,20 @@
 </div>
 
 <div class="section">
-    <h2>Daily Usage (30 days)</h2>
+    <h2>Usage Over Time (30 days)</h2>
     <div class="card">
         <canvas id="chartDailyUsage" height="100"></canvas>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Cost by Model</h3>
+        <canvas id="chartModelCost" height="200"></canvas>
+    </div>
+    <div class="card">
+        <h3>Cost by Provider</h3>
+        <canvas id="chartProviderCost" height="200"></canvas>
     </div>
 </div>
 
@@ -90,6 +101,47 @@
 </div>
 {% endif %}
 
+{% if team_model_breakdown|length > 0 %}
+<div class="section">
+    <h2>Models Used</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Cost</th></tr></thead>
+            <tbody>
+            {% for alias, data in team_model_breakdown %}
+            <tr>
+                <td><a href="{{ dash.turl('/dashboard/models/' ~ alias, dashboard_token|default('')) }}"><strong>{{ alias }}</strong></a></td>
+                <td>{{ data.requests|number_format }}</td>
+                <td>{{ data.tokens|number_format }}</td>
+                <td style="color:var(--yellow)">${{ data.cost|number_format(4) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if team_provider_breakdown|length > 0 %}
+<div class="section">
+    <h2>Providers Used</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>Provider</th><th>Requests</th><th>Cost</th></tr></thead>
+            <tbody>
+            {% for prov, data in team_provider_breakdown %}
+            <tr>
+                <td><a href="{{ dash.turl('/dashboard/providers/' ~ prov, dashboard_token|default('')) }}"><strong>{{ prov }}</strong></a></td>
+                <td>{{ data.requests|number_format }}</td>
+                <td style="color:var(--yellow)">${{ data.cost|number_format(4) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 {% if member_usage|length > 0 %}
 <div class="section">
     <h2>Member Usage (sorted by cost)</h2>
@@ -137,6 +189,13 @@
     </div>
 </div>
 {% endif %}
+
+{% if team_stats.requests == 0 %}
+<div class="empty">
+    <h3>No usage data yet</h3>
+    <p>Send requests using keys from this team to see analytics.</p>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -166,6 +225,38 @@ new Chart(document.getElementById('chartDailyUsage'), {
             y1: { ticks: { color: '#f59e0b' }, grid: { display: false }, position: 'right' }
         }
     }
+});
+</script>
+{% endif %}
+
+{% if team_model_breakdown|length > 0 %}
+<script>
+new Chart(document.getElementById('chartModelCost'), {
+    type: 'doughnut',
+    data: {
+        labels: {{ team_model_breakdown|keys|json_encode|raw }},
+        datasets: [{
+            data: {{ team_model_breakdown|map(v => v.cost)|json_encode|raw }},
+            backgroundColor: ['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#a855f7']
+        }]
+    },
+    options: { plugins: { legend: { labels: { color: '#e4e6f0' }, position: 'bottom' } } }
+});
+</script>
+{% endif %}
+
+{% if team_provider_breakdown|length > 0 %}
+<script>
+new Chart(document.getElementById('chartProviderCost'), {
+    type: 'doughnut',
+    data: {
+        labels: {{ team_provider_breakdown|keys|json_encode|raw }},
+        datasets: [{
+            data: {{ team_provider_breakdown|map(v => v.cost)|json_encode|raw }},
+            backgroundColor: ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899']
+        }]
+    },
+    options: { plugins: { legend: { labels: { color: '#e4e6f0' }, position: 'bottom' } } }
 });
 </script>
 {% endif %}

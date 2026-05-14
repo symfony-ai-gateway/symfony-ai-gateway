@@ -1,0 +1,135 @@
+{% extends "@AIGateway/dashboard/base.html.twig" %}
+{% import "@AIGateway/dashboard/base.html.twig" as dash %}
+
+{% block title %}AIGateway Dashboard — Provider {{ provider.name }}{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 class="page-title">Provider: {{ provider.name }}</h1>
+    <div style="display:flex;gap:8px">
+        <span class="badge badge-blue">{{ provider.format }}</span>
+        <a href="{{ dash.turl('/dashboard/providers/' ~ provider.name ~ '/edit', dashboard_token|default('')) }}" class="btn btn-primary" style="padding:6px 16px;font-size:13px">Edit</a>
+    </div>
+</div>
+
+<div class="grid grid-4">
+    <div class="card">
+        <h3>Requests</h3>
+        <div class="value blue">{{ provider_stats.requests|number_format }}</div>
+    </div>
+    <div class="card">
+        <h3>Tokens</h3>
+        <div class="value green">{{ provider_stats.tokens|number_format }}</div>
+    </div>
+    <div class="card">
+        <h3>Cost</h3>
+        <div class="value yellow">${{ provider_stats.cost|number_format(4) }}</div>
+    </div>
+    <div class="card">
+        <h3>Errors</h3>
+        <div class="value {% if provider_stats.errors > 0 %}red{% else %}green{% endif %}">{{ provider_stats.errors }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <dl class="def-list">
+        <dt>Format</dt>
+        <dd><span class="badge badge-blue">{{ provider.format }}</span></dd>
+        <dt>Base URL</dt>
+        <dd class="mono">{{ provider.base_url ?? 'default (API default)' }}</dd>
+        <dt>Completions Path</dt>
+        <dd class="mono">{{ provider.completions_path ?? '/v1/chat/completions' }}</dd>
+    </dl>
+</div>
+
+<div class="section">
+    <h2>Usage Over Time (60 days)</h2>
+    <div class="card">
+        <canvas id="chartDaily" height="100"></canvas>
+    </div>
+</div>
+
+{% if model_breakdown|length > 0 %}
+<div class="section">
+    <h2>Models using this provider</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Cost</th></tr></thead>
+            <tbody>
+            {% for m in model_breakdown %}
+            <tr>
+                <td><a href="{{ dash.turl('/dashboard/models/' ~ m.model_alias, dashboard_token|default('')) }}"><strong>{{ m.model_alias }}</strong></a></td>
+                <td>{{ m.requests|number_format }}</td>
+                <td>{{ m.tokens|number_format }}</td>
+                <td style="color:var(--yellow)">${{ m.cost|number_format(4) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if top_keys|length > 0 %}
+<div class="section">
+    <h2>Top API Keys using this provider</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>Key</th><th>Requests</th><th>Cost</th></tr></thead>
+            <tbody>
+            {% for k in top_keys %}
+            <tr>
+                <td><a href="{{ dash.turl('/dashboard/keys/' ~ k.key_id, dashboard_token|default('')) }}">{{ k.key_name }}</a></td>
+                <td>{{ k.requests|number_format }}</td>
+                <td style="color:var(--yellow)">${{ k.cost|number_format(4) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if provider_stats.requests == 0 %}
+<div class="empty">
+    <h3>No usage data yet</h3>
+    <p>Send requests using models linked to this provider to see analytics.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if daily_usage|length > 0 %}
+<script>
+new Chart(document.getElementById('chartDaily'), {
+    type: 'bar',
+    data: {
+        labels: {{ daily_usage|map(d => d.date)|json_encode|raw }},
+        datasets: [{
+            label: 'Requests',
+            data: {{ daily_usage|map(d => d.requests)|json_encode|raw }},
+            backgroundColor: '#6366f1',
+            yAxisID: 'y'
+        }, {
+            label: 'Cost (USD)',
+            data: {{ daily_usage|map(d => d.cost)|json_encode|raw }},
+            backgroundColor: '#f59e0b',
+            yAxisID: 'y1'
+        }]
+    },
+    options: {
+        plugins: { legend: { labels: { color: '#e4e6f0' } } },
+        scales: {
+            x: { ticks: { color: '#8b90a8', maxTicksLimit: 12 }, grid: { color: '#2e3348' } },
+            y: { ticks: { color: '#8b90a8' }, grid: { color: '#2e3348' }, position: 'left' },
+            y1: { ticks: { color: '#f59e0b' }, grid: { display: false }, position: 'right' }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

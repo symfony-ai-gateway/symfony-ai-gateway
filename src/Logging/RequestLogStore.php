@@ -242,6 +242,102 @@ final class RequestLogStore
         );
     }
 
+    // ── Provider detail queries ──────────────────────────────────────────────
+
+    /**
+     * @return array{requests: int, tokens: int, cost: float, errors: int}
+     */
+    public function getProviderStats(string $provider): array
+    {
+        return $this->aggregate('provider = ?', [$provider]);
+    }
+
+    /**
+     * @return list<array{model_alias: string, requests: int, tokens: int, cost: float}>
+     */
+    public function getProviderModelBreakdown(string $provider): array
+    {
+        return $this->connection->fetchAllAssociative(
+            'SELECT model_alias, COUNT(*) as requests, SUM(total_tokens) as tokens, SUM(cost_usd) as cost
+             FROM gateway_request_log WHERE provider = ? GROUP BY model_alias ORDER BY cost DESC',
+            [$provider],
+        );
+    }
+
+    /**
+     * @return list<array{key_id: string, key_name: string, requests: int, cost: float}>
+     */
+    public function getProviderTopKeys(string $provider, int $limit = 10): array
+    {
+        return $this->connection->fetchAllAssociative(
+            'SELECT key_id, key_name, COUNT(*) as requests, SUM(cost_usd) as cost
+             FROM gateway_request_log WHERE provider = ? AND key_id IS NOT NULL GROUP BY key_id ORDER BY cost DESC LIMIT ?',
+            [$provider, $limit],
+        );
+    }
+
+    /**
+     * @return list<array{date: string, requests: int, cost: float}>
+     */
+    public function getProviderDailyUsage(string $provider, int $days = 30): array
+    {
+        $since = time() - ($days * 86400);
+
+        return $this->connection->fetchAllAssociative(
+            "SELECT date(created_at, 'unixepoch') as date, COUNT(*) as requests, SUM(cost_usd) as cost
+             FROM gateway_request_log WHERE provider = ? AND created_at >= ? GROUP BY date ORDER BY date ASC",
+            [$provider, $since],
+        );
+    }
+
+    // ── Model detail queries ─────────────────────────────────────────────────
+
+    /**
+     * @return array{requests: int, tokens: int, cost: float, errors: int}
+     */
+    public function getModelStats(string $modelAlias): array
+    {
+        return $this->aggregate('model_alias = ?', [$modelAlias]);
+    }
+
+    /**
+     * @return list<array{team_id: string, team_name: string, requests: int, cost: float}>
+     */
+    public function getModelTeamBreakdown(string $modelAlias): array
+    {
+        return $this->connection->fetchAllAssociative(
+            'SELECT team_id, team_name, COUNT(*) as requests, SUM(cost_usd) as cost
+             FROM gateway_request_log WHERE model_alias = ? AND team_id IS NOT NULL GROUP BY team_id ORDER BY cost DESC',
+            [$modelAlias],
+        );
+    }
+
+    /**
+     * @return list<array{key_id: string, key_name: string, requests: int, tokens: int, cost: float}>
+     */
+    public function getModelKeyBreakdown(string $modelAlias): array
+    {
+        return $this->connection->fetchAllAssociative(
+            'SELECT key_id, key_name, COUNT(*) as requests, SUM(total_tokens) as tokens, SUM(cost_usd) as cost
+             FROM gateway_request_log WHERE model_alias = ? AND key_id IS NOT NULL GROUP BY key_id ORDER BY cost DESC',
+            [$modelAlias],
+        );
+    }
+
+    /**
+     * @return list<array{date: string, requests: int, cost: float}>
+     */
+    public function getModelDailyUsage(string $modelAlias, int $days = 30): array
+    {
+        $since = time() - ($days * 86400);
+
+        return $this->connection->fetchAllAssociative(
+            "SELECT date(created_at, 'unixepoch') as date, COUNT(*) as requests, SUM(cost_usd) as cost
+             FROM gateway_request_log WHERE model_alias = ? AND created_at >= ? GROUP BY date ORDER BY date ASC",
+            [$modelAlias, $since],
+        );
+    }
+
     /**
      * @return array{requests: int, tokens: int, cost: float, errors: int}
      */

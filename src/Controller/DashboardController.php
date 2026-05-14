@@ -130,6 +130,31 @@ final class DashboardController
         ])));
     }
 
+    #[Route('/dashboard/providers/{name}', name: 'ai_gateway_dashboard_provider_detail', methods: ['GET'])]
+    public function providerDetail(Request $request, string $name): Response
+    {
+        $provider = $this->configStore?->getProvider($name);
+
+        if (null === $provider) {
+            return new Response($this->twig->render('@AIGateway/dashboard/error.html.twig', $this->params($request, [
+                'message' => 'Provider not found.',
+            ])), 404);
+        }
+
+        $providerStats = $this->requestLogStore?->getProviderStats($name) ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
+        $modelBreakdown = $this->requestLogStore?->getProviderModelBreakdown($name) ?? [];
+        $topKeys = $this->requestLogStore?->getProviderTopKeys($name, 10) ?? [];
+        $dailyUsage = $this->requestLogStore?->getProviderDailyUsage($name, 60) ?? [];
+
+        return new Response($this->twig->render('@AIGateway/dashboard/providers_detail.html.twig', $this->params($request, [
+            'provider' => $provider,
+            'provider_stats' => $providerStats,
+            'model_breakdown' => $modelBreakdown,
+            'top_keys' => $topKeys,
+            'daily_usage' => $dailyUsage,
+        ])));
+    }
+
     #[Route('/dashboard/providers/{name}/delete', name: 'ai_gateway_dashboard_provider_delete', methods: ['POST'])]
     public function providerDelete(Request $request, string $name): Response
     {
@@ -215,6 +240,31 @@ final class DashboardController
             'model' => $model,
             'providers' => $providers,
             'action' => 'edit',
+        ])));
+    }
+
+    #[Route('/dashboard/models/{alias}', name: 'ai_gateway_dashboard_model_detail', methods: ['GET'])]
+    public function modelDetail(Request $request, string $alias): Response
+    {
+        $model = $this->configStore?->getModel($alias);
+
+        if (null === $model) {
+            return new Response($this->twig->render('@AIGateway/dashboard/error.html.twig', $this->params($request, [
+                'message' => 'Model not found.',
+            ])), 404);
+        }
+
+        $modelStats = $this->requestLogStore?->getModelStats($alias) ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
+        $teamBreakdown = $this->requestLogStore?->getModelTeamBreakdown($alias) ?? [];
+        $keyBreakdown = $this->requestLogStore?->getModelKeyBreakdown($alias) ?? [];
+        $dailyUsage = $this->requestLogStore?->getModelDailyUsage($alias, 60) ?? [];
+
+        return new Response($this->twig->render('@AIGateway/dashboard/models_detail.html.twig', $this->params($request, [
+            'model' => $model,
+            'model_stats' => $modelStats,
+            'team_breakdown' => $teamBreakdown,
+            'key_breakdown' => $keyBreakdown,
+            'daily_usage' => $dailyUsage,
         ])));
     }
 
@@ -339,6 +389,22 @@ final class DashboardController
         $recentLogs = $this->requestLogStore?->getKeyLogs($id, 20) ?? [];
         $keyDailyUsage = $this->requestLogStore?->getDailyUsage(30) ?? [];
 
+        // Get team-relative stats
+        $teamStats = null !== $key->teamId ? ($this->requestLogStore?->getTeamStats($key->teamId) ?? null) : null;
+        $keySharePct = null;
+        if (null !== $teamStats && $teamStats['cost'] > 0) {
+            $keySharePct = ($keyStats['cost'] / $teamStats['cost']) * 100;
+        }
+
+        // Extract unique providers from model breakdown
+        $providers = [];
+        foreach ($modelBreakdown as $mb) {
+            $modelData = $this->configStore?->getModel($mb['model_alias']);
+            if (null !== $modelData) {
+                $providers[$modelData['provider_name']] = ($providers[$modelData['provider_name']] ?? 0) + $mb['cost'];
+            }
+        }
+
         return new Response($this->twig->render('@AIGateway/dashboard/keys_detail.html.twig', $this->params($request, [
             'key' => $key,
             'team' => $team,
@@ -349,6 +415,9 @@ final class DashboardController
             'model_breakdown' => $modelBreakdown,
             'recent_logs' => $recentLogs,
             'key_daily_usage' => $keyDailyUsage,
+            'team_stats' => $teamStats,
+            'key_share_pct' => $keySharePct,
+            'providers' => $providers,
         ])));
     }
 
@@ -526,6 +595,27 @@ final class DashboardController
         $teamStats = $this->requestLogStore?->getTeamStats($id) ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
         $memberUsage = $this->requestLogStore?->getTeamMemberUsage($id) ?? [];
         $teamDailyUsage = $this->requestLogStore?->getDailyUsage(30) ?? [];
+        $teamLogs = $this->requestLogStore?->getTeamLogs($id, 5000) ?? [];
+
+        // Build model breakdown for this team from raw logs
+        $modelAgg = [];
+        $providerAgg = [];
+        foreach ($teamLogs as $log) {
+            /** @var array{model_alias: string, total_tokens: int, cost_usd: float, provider: string} $log */
+            $mAlias = $log['model_alias'];
+            $modelAgg[$mAlias] ??= ['requests' => 0, 'tokens' => 0, 'cost' => 0.0];
+            ++$modelAgg[$mAlias]['requests'];
+            $modelAgg[$mAlias]['tokens'] += $log['total_tokens'];
+            $modelAgg[$mAlias]['cost'] += $log['cost_usd'];
+
+            $prov = $log['provider'];
+            $providerAgg[$prov] ??= ['requests' => 0, 'cost' => 0.0];
+            ++$providerAgg[$prov]['requests'];
+            $providerAgg[$prov]['cost'] += $log['cost_usd'];
+        }
+        // Sort models by cost desc
+        uasort($modelAgg, static fn (array $a, array $b): int => $b['cost'] <=> $a['cost']);
+        uasort($providerAgg, static fn (array $a, array $b): int => $b['cost'] <=> $a['cost']);
 
         return new Response($this->twig->render('@AIGateway/dashboard/teams_detail.html.twig', $this->params($request, [
             'team' => $team,
@@ -535,6 +625,8 @@ final class DashboardController
             'team_stats' => $teamStats,
             'member_usage' => $memberUsage,
             'team_daily_usage' => $teamDailyUsage,
+            'team_model_breakdown' => $modelAgg,
+            'team_provider_breakdown' => $providerAgg,
         ])));
     }
 
