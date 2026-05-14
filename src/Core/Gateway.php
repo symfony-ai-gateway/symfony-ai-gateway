@@ -113,7 +113,15 @@ final class Gateway implements GatewayInterface
             $resolution = $this->tryResolveDynamic($requestedModel);
             $response = $this->executeSingle($request, $resolution);
         } else {
-            throw GatewayException::modelNotFound($requestedModel, $this->modelRegistry->getAvailableModels());
+            $available = $this->modelRegistry->getAvailableModels();
+            if (null !== $this->configStore) {
+                $dbModels = $this->configStore->listModels();
+                foreach ($dbModels as $dbModel) {
+                    $available[] = $dbModel['alias'];
+                }
+            }
+
+            throw GatewayException::modelNotFound($requestedModel, $available);
         }
 
         $durationMs = (microtime(true) - $startTime) * 1000;
@@ -185,7 +193,15 @@ final class Gateway implements GatewayInterface
         );
 
         if (!$this->modelRegistry->has($streamRequest->model) && null === $this->tryResolveDynamic($streamRequest->model)) {
-            throw GatewayException::modelNotFound($streamRequest->model, $this->modelRegistry->getAvailableModels());
+            $available = $this->modelRegistry->getAvailableModels();
+            if (null !== $this->configStore) {
+                $dbModels = $this->configStore->listModels();
+                foreach ($dbModels as $dbModel) {
+                    $available[] = $dbModel['alias'];
+                }
+            }
+
+            throw GatewayException::modelNotFound($streamRequest->model, $available);
         }
 
         $resolution = $this->modelRegistry->has($streamRequest->model)

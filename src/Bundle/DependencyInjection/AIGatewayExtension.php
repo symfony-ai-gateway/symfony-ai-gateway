@@ -94,10 +94,6 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
     {
         $models = $config['models'] ?? [];
 
-        if ([] === $models) {
-            throw new InvalidConfigurationException('At least one model must be configured under "ai_gateway.models".');
-        }
-
         $registryDefinition = $container
             ->autowire(ModelRegistry::class, ModelRegistry::class);
 
@@ -127,7 +123,7 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
         $providers = $config['providers'] ?? [];
 
         if ([] === $providers) {
-            throw new InvalidConfigurationException('At least one provider must be configured under "ai_gateway.providers".');
+            return;
         }
 
         $modelsByProvider = $this->collectModelsByProvider($config['models'] ?? []);
@@ -433,6 +429,7 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
             ->setArguments([
                 '$gateway' => new Reference(GatewayInterface::class),
                 '$modelRegistry' => new Reference(ModelRegistry::class),
+                '$configStore' => new Reference(ConfigStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$requestLogger' => new Reference('AIGateway\Logging\RequestLogger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$metrics' => new Reference('AIGateway\Metrics\PrometheusMetrics', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$authenticator' => $authConfig['enabled'] ?? false ? new Reference(ApiKeyAuthenticator::class) : null,

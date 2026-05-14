@@ -24,9 +24,8 @@ final class Configuration implements ConfigurationInterface
                 ->end()
 
                 ->arrayNode('providers')
-                    ->isRequired()
-                    ->requiresAtLeastOneElement()
                     ->useAttributeAsKey('name')
+                    ->defaultValue([])
                     ->arrayPrototype()
                         ->children()
                             ->enumNode('format')
@@ -65,9 +64,8 @@ final class Configuration implements ConfigurationInterface
                 ->end()
 
                 ->arrayNode('models')
-                    ->isRequired()
-                    ->requiresAtLeastOneElement()
                     ->useAttributeAsKey('name')
+                    ->defaultValue([])
                     ->arrayPrototype()
                         ->children()
                             ->scalarNode('provider')
