@@ -193,6 +193,47 @@ ai_gateway:
         enabled: false
 ```
 
+## Dashboard CRUD
+
+The dashboard lets you manage everything from the browser — no YAML editing required after initial setup. Tables are auto-created on first dashboard access.
+
+### Providers
+
+Add, edit, or delete LLM providers directly from `/dashboard/providers`. Each provider has:
+
+| Field | Description |
+|-------|-------------|
+| **Name** | Unique identifier (used in model config) |
+| **Format** | `openai`, `anthropic`, `gemini`, `ollama`, or `azure` |
+| **API Key** | Provider credential |
+| **Base URL** | Custom endpoint (leave empty for provider default) |
+| **Completions Path** | Defaults to `/v1/chat/completions` |
+
+### Models
+
+Create model aliases at `/dashboard/models` that map to a provider's model ID:
+
+| Field | Description |
+|-------|-------------|
+| **Alias** | Gateway-facing name (e.g. `gpt_4o`) |
+| **Provider** | Links to a provider (from above) |
+| **Model** | Provider's model ID (e.g. `gpt-4o`) |
+| **Input Price** | Cost per million input tokens (USD) |
+| **Output Price** | Cost per million output tokens (USD) |
+
+### Runtime Resolution
+
+The gateway resolves models in this order:
+
+1. **YAML config** (compile-time) — providers and models from `ai_gateway.yaml`
+2. **Database config** (runtime) — providers and models created via dashboard
+
+This means you can start with YAML for seed config, then add new providers/models from the dashboard without redeploying.
+
+### Keys & Teams
+
+Create API keys and teams from `/dashboard/keys/new` and `/dashboard/teams/new`. See the [Auth & Teams](#auth--teams) section for the hierarchy model.
+
 ## Auth & Teams
 
 Enable API key auth to require authentication for all `/v1/*` requests:
@@ -268,9 +309,22 @@ ai_gateway:
 | `GET` | `/v1/health` | Health check |
 | `GET` | `/v1/metrics` | Prometheus metrics |
 | `GET` | `/v1/stats` | JSON usage statistics |
-| `GET` | `/dashboard` | Web dashboard |
-| `GET` | `/dashboard/keys` | API key management |
-| `GET` | `/dashboard/teams` | Team management |
+| `GET` | `/dashboard` | Web dashboard — overview |
+| `GET` | `/dashboard/providers` | List providers |
+| `GET/POST` | `/dashboard/providers/new` | Add a provider |
+| `GET/POST` | `/dashboard/providers/{name}/edit` | Edit a provider |
+| `POST` | `/dashboard/providers/{name}/delete` | Delete a provider |
+| `GET` | `/dashboard/models` | List models |
+| `GET/POST` | `/dashboard/models/new` | Add a model |
+| `GET/POST` | `/dashboard/models/{alias}/edit` | Edit a model |
+| `POST` | `/dashboard/models/{alias}/delete` | Delete a model |
+| `GET` | `/dashboard/keys` | List API keys |
+| `GET/POST` | `/dashboard/keys/new` | Create an API key |
+| `GET` | `/dashboard/keys/{id}` | Key details + usage |
+| `POST` | `/dashboard/keys/{id}/revoke` | Revoke an API key |
+| `GET` | `/dashboard/teams` | List teams |
+| `GET/POST` | `/dashboard/teams/new` | Create a team |
+| `GET` | `/dashboard/teams/{id}` | Team details + keys |
 | `GET` | `/dashboard/analytics` | Charts and analytics |
 
 ## CLI Commands
