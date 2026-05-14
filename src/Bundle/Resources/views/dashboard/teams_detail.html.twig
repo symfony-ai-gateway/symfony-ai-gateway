@@ -4,7 +4,10 @@
 {% block title %}AIGateway Dashboard — Team {{ team.name }}{% endblock %}
 
 {% block content %}
-<h1 class="page-title">Team: {{ team.name }}</h1>
+<div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 class="page-title">Team: {{ team.name }}</h1>
+    <a href="{{ dash.turl('/dashboard/teams/' ~ team.id ~ '/edit', dashboard_token|default('')) }}" class="btn btn-primary" style="padding:6px 16px;font-size:13px">Edit</a>
+</div>
 
 <div class="card">
     <dl class="def-list">

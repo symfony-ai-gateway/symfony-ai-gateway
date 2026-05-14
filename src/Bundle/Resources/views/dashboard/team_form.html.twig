@@ -22,6 +22,9 @@
                     {% endfor %}
                 </select>
             </dd>
+            {% else %}
+            <dt><label for="name">Name</label></dt>
+            <dd><input type="text" id="name" name="name" required value="{{ team.name }}" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
             {% endif %}
 
             <dt><label for="budget_per_day">Budget / Day (USD)</label></dt>

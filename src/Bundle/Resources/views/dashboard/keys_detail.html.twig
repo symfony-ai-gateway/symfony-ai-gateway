@@ -6,11 +6,18 @@
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center">
     <h1 class="page-title">Key: {{ key.name }}</h1>
-    {% if key.enabled %}
-    <span class="badge badge-green">active</span>
-    {% else %}
-    <span class="badge badge-red">revoked</span>
-    {% endif %}
+    <div style="display:flex;gap:12px;align-items:center">
+        {% if key.enabled %}
+        <span class="badge badge-green">active</span>
+        <a href="{{ dash.turl('/dashboard/keys/' ~ key.id ~ '/edit', dashboard_token|default('')) }}" class="btn btn-primary" style="padding:6px 16px;font-size:13px">Edit</a>
+        <form method="POST" action="{{ dash.turl('/dashboard/keys/' ~ key.id ~ '/revoke', dashboard_token|default('')) }}" style="display:inline" onsubmit="return confirm('Revoke this key? It cannot be undone.')">
+            <button type="submit" class="btn btn-danger" style="padding:6px 16px;font-size:13px">Revoke</button>
+        </form>
+        {% else %}
+        <span class="badge badge-red">revoked</span>
+        <a href="{{ dash.turl('/dashboard/keys/' ~ key.id ~ '/edit', dashboard_token|default('')) }}" class="btn btn-primary" style="padding:6px 16px;font-size:13px">Edit</a>
+        {% endif %}
+    </div>
 </div>
 
 <div class="grid grid-2">

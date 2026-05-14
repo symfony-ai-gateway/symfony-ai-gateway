@@ -290,6 +290,52 @@ final class DashboardController
         ])));
     }
 
+    #[Route('/dashboard/keys/{id}/edit', name: 'ai_gateway_dashboard_key_edit', methods: ['GET', 'POST'])]
+    public function keyEdit(Request $request, string $id): Response
+    {
+        $key = $this->keyStore?->findKeyById($id);
+
+        if (null === $key) {
+            return new Response($this->twig->render('@AIGateway/dashboard/error.html.twig', $this->params($request, [
+                'message' => 'API key not found.',
+            ])), 404);
+        }
+
+        if ($request->isMethod('POST')) {
+            $selectedModels = array_filter(explode(',', $this->post($request, 'models')));
+            $teamId = $this->post($request, 'team_id') ?: null;
+
+            $updated = new ApiKey(
+                id: $key->id,
+                name: $this->post($request, 'name', $key->name),
+                keyHash: $key->keyHash,
+                tokenPrefix: $key->tokenPrefix,
+                teamId: $teamId,
+                overrides: new KeyRules(
+                    models: [] !== $selectedModels ? $selectedModels : null,
+                    budgetPerDay: '' !== $this->post($request, 'budget_per_day') ? (float) $this->post($request, 'budget_per_day') : null,
+                ),
+                enabled: $key->enabled,
+                expiresAt: $key->expiresAt,
+                createdAt: $key->createdAt,
+            );
+
+            $this->keyStore?->saveKey($updated);
+
+            return new RedirectResponse($this->url($request, '/dashboard/keys'));
+        }
+
+        $teams = $this->keyStore?->listTeams() ?? [];
+        $models = $this->configStore?->listModels() ?? [];
+        $modelAliases = array_map(static fn ($m): string => $m['alias'], $models);
+
+        return new Response($this->twig->render('@AIGateway/dashboard/key_edit.html.twig', $this->params($request, [
+            'key' => $key,
+            'teams' => $teams,
+            'model_aliases' => $modelAliases,
+        ])));
+    }
+
     #[Route('/dashboard/keys/{id}/revoke', name: 'ai_gateway_dashboard_key_revoke', methods: ['POST'])]
     public function keyRevoke(Request $request, string $id): Response
     {
@@ -392,6 +438,50 @@ final class DashboardController
             'parent_team' => $parentTeam,
             'ancestry' => $ancestry,
             'team_keys' => $teamKeys,
+        ])));
+    }
+
+    #[Route('/dashboard/teams/{id}/edit', name: 'ai_gateway_dashboard_team_edit', methods: ['GET', 'POST'])]
+    public function teamEdit(Request $request, string $id): Response
+    {
+        $team = $this->keyStore?->findTeamById($id);
+
+        if (null === $team) {
+            return new Response($this->twig->render('@AIGateway/dashboard/error.html.twig', $this->params($request, [
+                'message' => 'Team not found.',
+            ])), 404);
+        }
+
+        if ($request->isMethod('POST')) {
+            $selectedModels = array_filter(explode(',', $this->post($request, 'models')));
+
+            $updated = new Team(
+                id: $team->id,
+                name: $this->post($request, 'name', $team->name),
+                parentId: $team->parentId,
+                rules: new KeyRules(
+                    budgetPerDay: '' !== $this->post($request, 'budget_per_day') ? (float) $this->post($request, 'budget_per_day') : null,
+                    budgetPerMonth: '' !== $this->post($request, 'budget_per_month') ? (float) $this->post($request, 'budget_per_month') : null,
+                    rateLimitPerMinute: '' !== $this->post($request, 'rate_limit') ? (int) $this->post($request, 'rate_limit') : null,
+                    models: [] !== $selectedModels ? $selectedModels : null,
+                ),
+                createdAt: $team->createdAt,
+            );
+
+            $this->keyStore?->saveTeam($updated);
+
+            return new RedirectResponse($this->url($request, '/dashboard/teams'));
+        }
+
+        $allTeams = $this->keyStore?->listTeams() ?? [];
+        $models = $this->configStore?->listModels() ?? [];
+        $modelAliases = array_map(static fn ($m): string => $m['alias'], $models);
+
+        return new Response($this->twig->render('@AIGateway/dashboard/team_form.html.twig', $this->params($request, [
+            'team' => $team,
+            'teams' => $allTeams,
+            'model_aliases' => $modelAliases,
+            'action' => 'edit',
         ])));
     }
 
