@@ -320,19 +320,9 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
      */
     private function registerPipelines(array $config, ContainerBuilder $container): void
     {
-        $pipelines = [];
-        foreach ($config['pipelines'] ?? [] as $name => $pipelineConfig) {
-            $pipelines[$name] = $pipelineConfig['models'] ?? [];
-        }
+        $container->setParameter('ai_gateway.pipelines', $config['pipelines'] ?? []);
 
-        $container->setParameter('ai_gateway.pipelines', $pipelines);
-
-        $aliases = [];
-        foreach ($config['aliases'] ?? [] as $alias => $target) {
-            $aliases[$alias] = $target;
-        }
-
-        $container->setParameter('ai_gateway.aliases', $aliases);
+        $container->setParameter('ai_gateway.aliases', $config['aliases'] ?? []);
     }
 
     /**

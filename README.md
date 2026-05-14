@@ -49,10 +49,6 @@ ai_gateway:
     # Everything is managed via the dashboard or CLI.
     # See "CLI Commands" and "Dashboard" sections below.
 
-    aliases:
-        smart: gpt_4o
-        fast: deepseek_chat
-
     dashboard:
         tokenRequired: true
         token: '%env(DASHBOARD_TOKEN)%'
@@ -400,16 +396,6 @@ ai_gateway:
         enabled: true              # Show/hide dashboard routes
         tokenRequired: false       # Require token to access dashboard
         token: null                # Token string or env var (e.g. '%env(DASHBOARD_TOKEN)%')
-
-    # Optional: static routing aliases
-    aliases:
-        <alias>: <model-alias>
-        <alias>: 'pipeline:<name>'
-
-    # Optional: fallback pipelines
-    pipelines:
-        <name>:
-            models: [model1, model2, ...]
 
     # Optional: retry configuration
     retry:

@@ -185,12 +185,22 @@ final class DashboardController
         }
 
         if ($request->isMethod('POST')) {
+            $newAlias = $this->post($request, 'alias', $alias);
+            $providerName = $this->post($request, 'provider_name');
+            $providerModel = $this->post($request, 'model');
+            $pricingInput = (float) $this->post($request, 'pricing_input', '0');
+            $pricingOutput = (float) $this->post($request, 'pricing_output', '0');
+
+            if ($newAlias !== $alias) {
+                $this->configStore?->deleteModel($alias);
+            }
+
             $this->configStore?->saveModel(
-                alias: $alias,
-                providerName: $this->post($request, 'provider_name'),
-                model: $this->post($request, 'model'),
-                pricingInput: (float) $this->post($request, 'pricing_input', '0'),
-                pricingOutput: (float) $this->post($request, 'pricing_output', '0'),
+                alias: $newAlias,
+                providerName: $providerName,
+                model: $providerModel,
+                pricingInput: $pricingInput,
+                pricingOutput: $pricingOutput,
             );
 
             return new RedirectResponse($this->url($request, '/dashboard/models'));

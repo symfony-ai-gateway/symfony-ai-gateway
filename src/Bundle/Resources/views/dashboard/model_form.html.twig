@@ -9,10 +9,8 @@
 <div class="card">
     <form method="POST">
         <div class="def-list" style="grid-template-columns:160px 1fr;gap:16px">
-            {% if action == 'new' %}
             <dt><label for="alias">Alias</label></dt>
-            <dd><input type="text" id="alias" name="alias" required placeholder="e.g. gpt_4o (underscores, no dots)" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
-            {% endif %}
+            <dd><input type="text" id="alias" name="alias" required value="{{ model.alias ?? '' }}" placeholder="e.g. gpt_4o (underscores, no dots)" style="width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text)"></dd>
 
             <dt><label for="provider_name">Provider</label></dt>
             <dd>
