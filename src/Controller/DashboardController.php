@@ -589,6 +589,7 @@ final class DashboardController
 
     private function url(Request $request, string $path): string
     {
+        /** @var string $token */
         $token = $request->attributes->get('dashboard_token', '');
         $base = $request->getSchemeAndHttpHost();
 
