@@ -30,6 +30,7 @@ use AIGateway\Provider\ProviderCapabilities;
 use AIGateway\Provider\SymfonyAi\SymfonyAiProviderAdapter;
 
 use function dirname;
+use function is_string;
 use function sprintf;
 
 use Symfony\AI\Platform\Bridge\Anthropic\Factory as AnthropicFactory;
@@ -75,7 +76,7 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
         $this->registerProviderHttpClient($container);
         $this->registerPipelines($mergedConfig, $container);
         $this->registerRetryConfig($mergedConfig, $container);
-        $this->registerAuth($mergedConfig, $container);
+        $this->registerAuth($container);
         $this->registerControllers($mergedConfig, $container);
         $this->registerGateway($container);
         $this->registerRouteLoader($mergedConfig, $container);
@@ -382,18 +383,8 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
         $container->setAlias(GatewayInterface::class, Gateway::class);
     }
 
-    /**
-     * @param array<string, mixed> $config
-     */
-    private function registerAuth(array $config, ContainerBuilder $container): void
+    private function registerAuth(ContainerBuilder $container): void
     {
-        $authConfig = $config['auth'] ?? [];
-        $enabled = $authConfig['enabled'] ?? false;
-
-        if (!$enabled) {
-            return;
-        }
-
         $container->register(SlidingWindowKeyRateLimiter::class, SlidingWindowKeyRateLimiter::class)
             ->setArguments([
                 '$connection' => new Reference('doctrine.dbal.default_connection', ContainerInterface::NULL_ON_INVALID_REFERENCE),
@@ -423,23 +414,21 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
      */
     private function registerControllers(array $config, ContainerBuilder $container): void
     {
-        $authConfig = $config['auth'] ?? [];
-
         $container->register(ChatController::class, ChatController::class)
             ->setArguments([
                 '$gateway' => new Reference(GatewayInterface::class),
                 '$configStore' => new Reference(ConfigStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$requestLogger' => new Reference('AIGateway\Logging\RequestLogger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$metrics' => new Reference('AIGateway\Metrics\PrometheusMetrics', ContainerInterface::NULL_ON_INVALID_REFERENCE),
-                '$authenticator' => $authConfig['enabled'] ?? false ? new Reference(ApiKeyAuthenticator::class) : null,
-                '$authRequired' => $authConfig['required'] ?? true,
+                '$authenticator' => new Reference(ApiKeyAuthenticator::class),
+                '$authRequired' => true,
             ])
             ->addTag('controller.service_arguments');
 
         $container->register(DashboardController::class, DashboardController::class)
             ->setArguments([
                 '$twig' => new Reference('twig'),
-                '$keyStore' => $authConfig['enabled'] ?? false ? new Reference(KeyStoreInterface::class) : null,
+                '$keyStore' => new Reference(KeyStoreInterface::class),
                 '$requestLogger' => new Reference('AIGateway\Logging\RequestLogger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$configStore' => new Reference(ConfigStore::class, ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ])
@@ -476,11 +465,11 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
             ])
             ->addTag('kernel.event_subscriber');
 
+        /** @var array<string, mixed> $dashboardConfig */
         $dashboardConfig = $config['dashboard'] ?? [];
-        $dashboardAuth = $dashboardConfig['auth'] ?? [];
-        $dashboardToken = $dashboardAuth['token'] ?? null;
+        $dashboardToken = isset($dashboardConfig['token']) && is_string($dashboardConfig['token']) ? $dashboardConfig['token'] : null;
 
-        if (($dashboardAuth['enabled'] ?? false) && null !== $dashboardToken && '' !== $dashboardToken) {
+        if (($dashboardConfig['tokenRequired'] ?? false) && null !== $dashboardToken && '' !== $dashboardToken) {
             $container->register(DashboardAuthSubscriber::class, DashboardAuthSubscriber::class)
                 ->setArguments([
                     '$dashboardToken' => $dashboardToken,
