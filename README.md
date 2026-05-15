@@ -374,10 +374,7 @@ When a key belongs to a team, its overrides are validated against the team's lim
 |----------|--------|-------|
 | **OpenAI** | `openai` | Native or custom base URL |
 | **Anthropic** | `anthropic` | Claude models |
-| **Google Gemini** | `gemini` | Gemini Pro, Flash |
-| **Ollama** | `ollama` | Local models |
-| **Azure OpenAI** | `azure` | Enterprise Azure |
-| **Any OpenAI-compatible** | `openai` + `base_url` | DeepSeek, Groq, OpenRouter, Mistral... |
+| **Any OpenAI-compatible** | `openai` + `base_url` | DeepSeek, Groq, OpenRouter, Mistral, Gemini, Ollama, Bedrock... |
 
 ## API Endpoints
 
@@ -406,7 +403,7 @@ When a key belongs to a team, its overrides are validated against the team's lim
 | `GET/POST` | `/dashboard/teams/new` | Create a team |
 | `GET/POST` | `/dashboard/teams/{id}/edit` | Edit a team |
 | `GET` | `/dashboard/teams/{id}` | Team details + keys |
-| `GET` | `/dashboard/analytics` | Charts and analytics |
+| `GET` | `/dashboard/requests` | Request logs & analytics |
 
 ## Configuration Reference
 
