@@ -16,6 +16,7 @@
     </div>
 </div>
 
+{# ── 1. Stats cards ── #}
 <div class="grid grid-4">
     <div class="card">
         <h3>Requests</h3>
@@ -35,7 +36,8 @@
     </div>
 </div>
 
-<div class="card">
+{# ── 2. Info card ── #}
+<div class="card section">
     <dl class="def-list">
         <dt>Format</dt>
         <dd><span class="badge badge-blue">{{ provider.format }}</span></dd>
@@ -46,21 +48,37 @@
     </dl>
 </div>
 
+{# ── 3. Daily chart ── #}
+{% set du = daily_usage|default([]) %}
+{% if du|length > 0 %}
 <div class="section">
     <h2>Usage Over Time (60 days)</h2>
-    <div class="card">
-        <canvas id="chartDaily" height="100"></canvas>
+    <div class="card"><canvas id="chartDaily" height="100"></canvas></div>
+</div>
+{% endif %}
+
+{# ── 4. Doughnuts: Tokens / Cost / Requests by Model ── #}
+{% set mb = model_breakdown|default([]) %}
+{% if mb|length > 0 %}
+<div class="section">
+    <h2>Breakdown by Model</h2>
+    <div class="grid grid-3">
+        <div class="card"><h3>Tokens by Model</h3><canvas id="chartPTokMod" height="160"></canvas></div>
+        <div class="card"><h3>Cost by Model</h3><canvas id="chartPCostMod" height="160"></canvas></div>
+        <div class="card"><h3>Requests by Model</h3><canvas id="chartPReqMod" height="160"></canvas></div>
     </div>
 </div>
+{% endif %}
 
-{% if model_breakdown|length > 0 %}
+{# ── 5. Breakdown table: Models ── #}
+{% if mb|length > 0 %}
 <div class="section">
-    <h2>Models using this provider</h2>
+    <h2>Models</h2>
     <div class="card" style="padding:0;overflow:hidden">
         <table>
             <thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Cost</th></tr></thead>
             <tbody>
-            {% for m in model_breakdown %}
+            {% for m in mb %}
             <tr>
                 <td><a href="{{ dash.turl('/dashboard/models/' ~ m.model_alias, dashboard_token|default('')) }}"><strong>{{ m.model_alias }}</strong></a></td>
                 <td>{{ m.requests|number_format }}</td>
@@ -74,14 +92,27 @@
 </div>
 {% endif %}
 
-{% if top_keys|length > 0 %}
+{# ── 6. Doughnuts: Cost / Requests by Key ── #}
+{% set tk = top_keys|default([]) %}
+{% if tk|length > 0 %}
 <div class="section">
-    <h2>Top API Keys using this provider</h2>
+    <h2>Breakdown by Key</h2>
+    <div class="grid grid-3">
+        <div class="card"><h3>Cost by Key</h3><canvas id="chartPCostKey" height="160"></canvas></div>
+        <div class="card"><h3>Requests by Key</h3><canvas id="chartPReqKey" height="160"></canvas></div>
+    </div>
+</div>
+{% endif %}
+
+{# ── 7. Breakdown table: Keys ── #}
+{% if tk|length > 0 %}
+<div class="section">
+    <h2>API Keys</h2>
     <div class="card" style="padding:0;overflow:hidden">
         <table>
             <thead><tr><th>Key</th><th>Requests</th><th>Cost</th></tr></thead>
             <tbody>
-            {% for k in top_keys %}
+            {% for k in tk %}
             <tr>
                 <td><a href="{{ dash.turl('/dashboard/keys/' ~ k.key_id, dashboard_token|default('')) }}">{{ k.key_name }}</a></td>
                 <td>{{ k.requests|number_format }}</td>
@@ -94,31 +125,52 @@
 </div>
 {% endif %}
 
-{% if provider_stats.requests == 0 %}
-<div class="empty">
-    <h3>No usage data yet</h3>
-    <p>Send requests using models linked to this provider to see analytics.</p>
+{# ── 8. Recent Requests ── #}
+{% set rl = recent_logs|default([]) %}
+{% if rl|length > 0 %}
+<div class="section">
+    <h2>Recent Requests ({{ provider_stats.requests|number_format }} total)</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>Time</th><th>Key</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Duration</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for log in rl %}
+            <tr>
+                <td class="mono" style="font-size:12px">{{ log.created_at|date('Y-m-d H:i') }}</td>
+                <td>{% if log.key_id %}<a href="{{ dash.turl('/dashboard/keys/' ~ log.key_id, dashboard_token|default('')) }}">{{ log.key_name }}</a>{% else %}<span style="color:var(--text2)">—</span>{% endif %}</td>
+                <td><a href="{{ dash.turl('/dashboard/models/' ~ log.model_alias, dashboard_token|default('')) }}">{{ log.model_alias }}</a></td>
+                <td>{{ log.total_tokens|number_format }} <span style="color:var(--text2);font-size:12px">({{ log.prompt_tokens }}↑ {{ log.completion_tokens }}↓)</span></td>
+                <td style="color:var(--yellow)">${{ log.cost_usd|number_format(6) }}</td>
+                <td>{{ log.duration_ms|number_format(1) }}ms</td>
+                <td>{% if log.cached %}<span class="badge badge-green">cached</span>{% elseif log.status_code >= 400 %}<span class="badge badge-red">{{ log.status_code }}</span>{% else %}<span class="badge badge-green">{{ log.status_code }}</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
+{% endif %}
+
+{% if provider_stats.requests == 0 %}
+<div class="empty"><h3>No usage data yet</h3><p>Send requests using models linked to this provider to see analytics.</p></div>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
-{% if daily_usage|length > 0 %}
 <script>
+const colors = ['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#a855f7'];
+const dOpts = { plugins: { legend: { labels: { color: '#e4e6f0', boxWidth: 12 }, position: 'bottom' } } };
+
+{% set du = daily_usage|default([]) %}
+{% if du|length > 0 %}
 new Chart(document.getElementById('chartDaily'), {
     type: 'bar',
     data: {
-        labels: {{ daily_usage|map(d => d.date)|json_encode|raw }},
+        labels: {{ du|map(d => d.date)|json_encode(15)|raw }},
         datasets: [{
-            label: 'Requests',
-            data: {{ daily_usage|map(d => d.requests)|json_encode|raw }},
-            backgroundColor: '#6366f1',
-            yAxisID: 'y'
+            label: 'Requests', data: {{ du|map(d => d.requests)|json_encode(15)|raw }}, backgroundColor: '#6366f1', yAxisID: 'y'
         }, {
-            label: 'Cost (USD)',
-            data: {{ daily_usage|map(d => d.cost)|json_encode|raw }},
-            backgroundColor: '#f59e0b',
-            yAxisID: 'y1'
+            label: 'Cost (USD)', data: {{ du|map(d => d.cost)|json_encode(15)|raw }}, backgroundColor: '#f59e0b', yAxisID: 'y1'
         }]
     },
     options: {
@@ -130,6 +182,19 @@ new Chart(document.getElementById('chartDaily'), {
         }
     }
 });
-</script>
 {% endif %}
+
+{% set mb = model_breakdown|default([]) %}
+{% if mb|length > 0 %}
+new Chart(document.getElementById('chartPTokMod'), { type:'doughnut', data:{labels:{{ mb|map(v => v.model_alias)|json_encode|raw }},datasets:[{data:{{ mb|map(v => v.tokens)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+new Chart(document.getElementById('chartPCostMod'), { type:'doughnut', data:{labels:{{ mb|map(v => v.model_alias)|json_encode|raw }},datasets:[{data:{{ mb|map(v => v.cost)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+new Chart(document.getElementById('chartPReqMod'), { type:'doughnut', data:{labels:{{ mb|map(v => v.model_alias)|json_encode|raw }},datasets:[{data:{{ mb|map(v => v.requests)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+{% endif %}
+
+{% set tk = top_keys|default([]) %}
+{% if tk|length > 0 %}
+new Chart(document.getElementById('chartPCostKey'), { type:'doughnut', data:{labels:{{ tk|map(v => v.key_name ? v.key_name : v.key_id)|json_encode|raw }},datasets:[{data:{{ tk|map(v => v.cost)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+new Chart(document.getElementById('chartPReqKey'), { type:'doughnut', data:{labels:{{ tk|map(v => v.key_name ? v.key_name : v.key_id)|json_encode|raw }},datasets:[{data:{{ tk|map(v => v.requests)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+{% endif %}
+</script>
 {% endblock %}

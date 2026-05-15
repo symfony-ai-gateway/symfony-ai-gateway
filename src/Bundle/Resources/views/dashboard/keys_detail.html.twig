@@ -24,61 +24,35 @@
     </div>
 </div>
 
+{# ── 1. Stats cards ── #}
 <div class="grid grid-4">
-    <div class="card">
-        <h3>Total Requests</h3>
-        <div class="value blue">{{ key_stats.requests|number_format }}</div>
-    </div>
-    <div class="card">
-        <h3>Total Tokens</h3>
-        <div class="value green">{{ key_stats.tokens|number_format }}</div>
-    </div>
-    <div class="card">
-        <h3>Total Cost</h3>
-        <div class="value yellow">${{ key_stats.cost|number_format(4) }}</div>
-    </div>
-    <div class="card">
-        <h3>Errors</h3>
-        <div class="value {% if key_stats.errors > 0 %}red{% else %}green{% endif %}">{{ key_stats.errors }}</div>
-    </div>
+    <div class="card"><h3>Requests</h3><div class="value blue">{{ key_stats.requests|number_format }}</div></div>
+    <div class="card"><h3>Tokens</h3><div class="value green">{{ key_stats.tokens|number_format }}</div></div>
+    <div class="card"><h3>Cost</h3><div class="value yellow">${{ key_stats.cost|number_format(4) }}</div></div>
+    <div class="card"><h3>Errors</h3><div class="value {% if key_stats.errors > 0 %}red{% else %}green{% endif %}">{{ key_stats.errors }}</div></div>
 </div>
 
-<div class="section">
-    <h2>Usage Over Time (30 days)</h2>
-    <div class="card">
-        <canvas id="chartDaily" height="100"></canvas>
-    </div>
-</div>
-
+{# ── 2. Info + Usage Today ── #}
 <div class="grid grid-2">
     <div class="card">
         <h3>Details</h3>
         <dl class="def-list">
-            <dt>ID</dt>
-            <dd class="mono">{{ key.id }}</dd>
-            <dt>Prefix</dt>
-            <dd class="mono">{{ key.tokenPrefix }}...</dd>
+            <dt>ID</dt><dd class="mono">{{ key.id }}</dd>
+            <dt>Prefix</dt><dd class="mono">{{ key.tokenPrefix }}...</dd>
             <dt>Team</dt>
             <dd>{% if team %}<a href="{{ dash.turl('/dashboard/teams/' ~ team.id, dashboard_token|default('')) }}">{{ team.name }}</a>{% else %}<span style="color:var(--text2)">none (standalone)</span>{% endif %}</dd>
-            <dt>Enabled</dt>
-            <dd>{{ key.enabled ? 'yes' : 'no' }}</dd>
-            <dt>Expired</dt>
-            <dd>{{ key.isExpired() ? 'yes' : 'no' }}</dd>
-            <dt>Created</dt>
-            <dd>{{ key.createdAt|date('Y-m-d H:i:s') }}</dd>
+            <dt>Enabled</dt><dd>{{ key.enabled ? 'yes' : 'no' }}</dd>
+            <dt>Expired</dt><dd>{{ key.isExpired() ? 'yes' : 'no' }}</dd>
+            <dt>Created</dt><dd>{{ key.createdAt|date('Y-m-d H:i:s') }}</dd>
         </dl>
     </div>
-
     <div class="card">
         <h3>Usage Today</h3>
         {% if usage_today %}
         <dl class="def-list">
-            <dt>Requests</dt>
-            <dd>{{ usage_today.requests }}</dd>
-            <dt>Tokens</dt>
-            <dd>{{ usage_today.tokens|number_format }}</dd>
-            <dt>Cost</dt>
-            <dd style="color:var(--yellow)">${{ usage_today.costUsd|number_format(6) }}</dd>
+            <dt>Requests</dt><dd>{{ usage_today.requests }}</dd>
+            <dt>Tokens</dt><dd>{{ usage_today.tokens|number_format }}</dd>
+            <dt>Cost</dt><dd style="color:var(--yellow)">${{ usage_today.costUsd|number_format(6) }}</dd>
         </dl>
         {% else %}
         <p style="color:var(--text2)">No usage recorded today.</p>
@@ -93,33 +67,38 @@
     </div>
 </div>
 
-{% if providers|length > 0 %}
+{# ── 3. Daily chart (stacked bar by model) ── #}
+{% set stacked_dates = daily_dates|default([]) %}
+{% set stacked_ds = daily_model_datasets|default([]) %}
+{% if stacked_dates|length > 0 and stacked_ds|length > 0 %}
 <div class="section">
-    <h2>Providers Used</h2>
-    <div class="card" style="padding:0;overflow:hidden">
-        <table>
-            <thead><tr><th>Provider</th><th>Cost</th></tr></thead>
-            <tbody>
-            {% for prov, cost in providers %}
-            <tr>
-                <td><a href="{{ dash.turl('/dashboard/providers/' ~ prov, dashboard_token|default('')) }}"><strong>{{ prov }}</strong></a></td>
-                <td style="color:var(--yellow)">${{ cost|number_format(4) }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+    <h2>Usage Over Time (30 days)</h2>
+    <div class="card"><canvas id="chartDaily" height="100"></canvas></div>
+</div>
+{% endif %}
+
+{# ── 4. Doughnuts: Tokens / Cost / Requests by Model ── #}
+{% set mb = model_breakdown|default([]) %}
+{% if mb|length > 0 %}
+<div class="section">
+    <h2>Breakdown by Model</h2>
+    <div class="grid grid-3">
+        <div class="card"><h3>Tokens by Model</h3><canvas id="chartKTokMod" height="160"></canvas></div>
+        <div class="card"><h3>Cost by Model</h3><canvas id="chartKCostMod" height="160"></canvas></div>
+        <div class="card"><h3>Requests by Model</h3><canvas id="chartKReqMod" height="160"></canvas></div>
     </div>
 </div>
 {% endif %}
 
-{% if model_breakdown|length > 0 %}
+{# ── 5. Breakdown table: Models ── #}
+{% if mb|length > 0 %}
 <div class="section">
-    <h2>Model Breakdown</h2>
+    <h2>Models</h2>
     <div class="card" style="padding:0;overflow:hidden">
         <table>
             <thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Cost</th></tr></thead>
             <tbody>
-            {% for m in model_breakdown %}
+            {% for m in mb %}
             <tr>
                 <td><a href="{{ dash.turl('/dashboard/models/' ~ m.model_alias, dashboard_token|default('')) }}"><strong>{{ m.model_alias }}</strong></a></td>
                 <td>{{ m.requests|number_format }}</td>
@@ -133,16 +112,16 @@
 </div>
 {% endif %}
 
-{% if recent_logs|length > 0 %}
+{# ── 6. Recent Requests ── #}
+{% set rl = recent_logs|default([]) %}
+{% if rl|length > 0 %}
 <div class="section">
-    <h2>Recent Requests ({{ key_stats.requests }} total)</h2>
+    <h2>Recent Requests ({{ key_stats.requests|number_format }} total)</h2>
     <div class="card" style="padding:0;overflow:hidden">
         <table>
-            <thead>
-                <tr><th>Time</th><th>Model</th><th>Provider</th><th>Tokens</th><th>Cost</th><th>Duration</th><th>Status</th></tr>
-            </thead>
+            <thead><tr><th>Time</th><th>Model</th><th>Provider</th><th>Tokens</th><th>Cost</th><th>Duration</th><th>Status</th></tr></thead>
             <tbody>
-            {% for log in recent_logs %}
+            {% for log in rl %}
             <tr>
                 <td class="mono" style="font-size:12px">{{ log.created_at|date('Y-m-d H:i') }}</td>
                 <td><a href="{{ dash.turl('/dashboard/models/' ~ log.model_alias, dashboard_token|default('')) }}">{{ log.model_alias }}</a></td>
@@ -150,15 +129,7 @@
                 <td>{{ log.total_tokens|number_format }} <span style="color:var(--text2);font-size:12px">({{ log.prompt_tokens }}↑ {{ log.completion_tokens }}↓)</span></td>
                 <td style="color:var(--yellow)">${{ log.cost_usd|number_format(6) }}</td>
                 <td>{{ log.duration_ms|number_format(1) }}ms</td>
-                <td>
-                    {% if log.cached %}
-                    <span class="badge badge-green">cached</span>
-                    {% elseif log.status_code >= 400 %}
-                    <span class="badge badge-red">{{ log.status_code }}</span>
-                    {% else %}
-                    <span class="badge badge-green">{{ log.status_code }}</span>
-                    {% endif %}
-                </td>
+                <td>{% if log.cached %}<span class="badge badge-green">cached</span>{% elseif log.status_code >= 400 %}<span class="badge badge-red">{{ log.status_code }}</span>{% else %}<span class="badge badge-green">{{ log.status_code }}</span>{% endif %}</td>
             </tr>
             {% endfor %}
             </tbody>
@@ -167,42 +138,15 @@
 </div>
 {% endif %}
 
+{# ── 7. Rules ── #}
 <div class="section">
     <h2>Effective Rules {% if team %}<span style="color:var(--text2);font-size:14px;font-weight:normal">(what actually applies)</span>{% endif %}</h2>
     <div class="card">
         <dl class="def-list">
-            <dt>Budget / Day</dt>
-            <dd>
-                {% if effective_rules.budgetPerDay is not null %}
-                    ${{ effective_rules.budgetPerDay|number_format(2) }}
-                {% else %}
-                    <span style="color:var(--text2)">unlimited</span>
-                {% endif %}
-            </dd>
-            <dt>Budget / Month</dt>
-            <dd>
-                {% if effective_rules.budgetPerMonth is not null %}
-                    ${{ effective_rules.budgetPerMonth|number_format(2) }}
-                {% else %}
-                    <span style="color:var(--text2)">unlimited</span>
-                {% endif %}
-            </dd>
-            <dt>Rate Limit</dt>
-            <dd>
-                {% if effective_rules.rateLimitPerMinute is not null %}
-                    {{ effective_rules.rateLimitPerMinute }} req/min
-                {% else %}
-                    <span style="color:var(--text2)">unlimited</span>
-                {% endif %}
-            </dd>
-            <dt>Models</dt>
-            <dd>
-                {% if effective_rules.models is not null %}
-                    {{ effective_rules.models|join(', ') }}
-                {% else %}
-                    all
-                {% endif %}
-            </dd>
+            <dt>Budget / Day</dt><dd>{% if effective_rules.budgetPerDay is not null %}${{ effective_rules.budgetPerDay|number_format(2) }}{% else %}<span style="color:var(--text2)">unlimited</span>{% endif %}</dd>
+            <dt>Budget / Month</dt><dd>{% if effective_rules.budgetPerMonth is not null %}${{ effective_rules.budgetPerMonth|number_format(2) }}{% else %}<span style="color:var(--text2)">unlimited</span>{% endif %}</dd>
+            <dt>Rate Limit</dt><dd>{% if effective_rules.rateLimitPerMinute is not null %}{{ effective_rules.rateLimitPerMinute }} req/min{% else %}<span style="color:var(--text2)">unlimited</span>{% endif %}</dd>
+            <dt>Models</dt><dd>{% if effective_rules.models is not null %}{{ effective_rules.models|join(', ') }}{% else %}all{% endif %}</dd>
         </dl>
     </div>
 </div>
@@ -214,28 +158,20 @@
         <div class="card">
             <h3>Team Rules <span style="color:var(--text2);font-weight:normal">({{ team.name }})</span></h3>
             <dl class="def-list">
-                <dt>Budget / Day</dt>
-                <dd>{{ team.rules.budgetPerDay is not null ? '$' ~ team.rules.budgetPerDay|number_format(2) : '<span style="color:var(--text2)">unlimited</span>' }}</dd>
-                <dt>Budget / Month</dt>
-                <dd>{{ team.rules.budgetPerMonth is not null ? '$' ~ team.rules.budgetPerMonth|number_format(2) : '<span style="color:var(--text2)">unlimited</span>' }}</dd>
-                <dt>Rate Limit</dt>
-                <dd>{{ team.rules.rateLimitPerMinute is not null ? team.rules.rateLimitPerMinute ~ ' req/min' : '<span style="color:var(--text2)">unlimited</span>' }}</dd>
-                <dt>Models</dt>
-                <dd>{{ team.rules.models is not null ? team.rules.models|join(', ') : 'all' }}</dd>
+                <dt>Budget / Day</dt><dd>{{ team.rules.budgetPerDay is not null ? '$' ~ team.rules.budgetPerDay|number_format(2) : '<span style="color:var(--text2)">unlimited</span>' }}</dd>
+                <dt>Budget / Month</dt><dd>{{ team.rules.budgetPerMonth is not null ? '$' ~ team.rules.budgetPerMonth|number_format(2) : '<span style="color:var(--text2)">unlimited</span>' }}</dd>
+                <dt>Rate Limit</dt><dd>{{ team.rules.rateLimitPerMinute is not null ? team.rules.rateLimitPerMinute ~ ' req/min' : '<span style="color:var(--text2)">unlimited</span>' }}</dd>
+                <dt>Models</dt><dd>{{ team.rules.models is not null ? team.rules.models|join(', ') : 'all' }}</dd>
             </dl>
         </div>
         <div class="card">
             <h3>Key Overrides {% if not has_own_overrides %}<span style="color:var(--text2);font-weight:normal">(inherits everything)</span>{% endif %}</h3>
             {% if has_own_overrides %}
             <dl class="def-list">
-                <dt>Budget / Day</dt>
-                <dd>{{ key.overrides.budgetPerDay is not null ? '$' ~ key.overrides.budgetPerDay|number_format(2) : '<span style="color:var(--text2)">inherits</span>' }}</dd>
-                <dt>Budget / Month</dt>
-                <dd>{{ key.overrides.budgetPerMonth is not null ? '$' ~ key.overrides.budgetPerMonth|number_format(2) : '<span style="color:var(--text2)">inherits</span>' }}</dd>
-                <dt>Rate Limit</dt>
-                <dd>{{ key.overrides.rateLimitPerMinute is not null ? key.overrides.rateLimitPerMinute ~ ' req/min' : '<span style="color:var(--text2)">inherits</span>' }}</dd>
-                <dt>Models</dt>
-                <dd>{{ key.overrides.models is not null ? key.overrides.models|join(', ') : '<span style="color:var(--text2)">inherits</span>' }}</dd>
+                <dt>Budget / Day</dt><dd>{{ key.overrides.budgetPerDay is not null ? '$' ~ key.overrides.budgetPerDay|number_format(2) : '<span style="color:var(--text2)">inherits</span>' }}</dd>
+                <dt>Budget / Month</dt><dd>{{ key.overrides.budgetPerMonth is not null ? '$' ~ key.overrides.budgetPerMonth|number_format(2) : '<span style="color:var(--text2)">inherits</span>' }}</dd>
+                <dt>Rate Limit</dt><dd>{{ key.overrides.rateLimitPerMinute is not null ? key.overrides.rateLimitPerMinute ~ ' req/min' : '<span style="color:var(--text2)">inherits</span>' }}</dd>
+                <dt>Models</dt><dd>{{ key.overrides.models is not null ? key.overrides.models|join(', ') : '<span style="color:var(--text2)">inherits</span>' }}</dd>
             </dl>
             {% else %}
             <p style="color:var(--text2)">No overrides — this key inherits all rules from team <strong>{{ team.name }}</strong>.</p>
@@ -247,33 +183,38 @@
 {% endblock %}
 
 {% block scripts %}
-{% if key_daily_usage|length > 0 %}
 <script>
+const colors = ['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#a855f7'];
+
+{% set stacked_dates = daily_dates|default([]) %}
+{% set stacked_ds = daily_model_datasets|default([]) %}
+{% if stacked_dates|length > 0 and stacked_ds|length > 0 %}
 new Chart(document.getElementById('chartDaily'), {
     type: 'bar',
     data: {
-        labels: {{ key_daily_usage|map(d => d.date)|json_encode|raw }},
-        datasets: [{
-            label: 'Requests',
-            data: {{ key_daily_usage|map(d => d.requests)|json_encode|raw }},
-            backgroundColor: '#6366f1',
-            yAxisID: 'y'
-        }, {
-            label: 'Tokens',
-            data: {{ key_daily_usage|map(d => d.tokens)|json_encode|raw }},
-            backgroundColor: '#22c55e',
-            yAxisID: 'y1'
-        }]
+        labels: {{ stacked_dates|json_encode(15)|raw }},
+        datasets: [
+            {% for ds in stacked_ds %}
+            { label: {{ ds.label|json_encode(15)|raw }}, data: {{ ds.data|json_encode(15)|raw }}, backgroundColor: colors[{{ loop.index0 }}], stack: 'stack0' }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ]
     },
     options: {
-        plugins: { legend: { labels: { color: '#e4e6f0' } } },
+        plugins: { legend: { labels: { color: '#e4e6f0', boxWidth: 12 }, position: 'bottom' }, tooltip: { mode: 'index', intersect: false } },
         scales: {
-            x: { ticks: { color: '#8b90a8', maxTicksLimit: 10 }, grid: { color: '#2e3348' } },
-            y: { ticks: { color: '#8b90a8' }, grid: { color: '#2e3348' }, position: 'left' },
-            y1: { ticks: { color: '#22c55e' }, grid: { display: false }, position: 'right' }
+            x: { stacked: true, ticks: { color: '#8b90a8', maxTicksLimit: 14 }, grid: { color: '#2e3348' } },
+            y: { stacked: true, ticks: { color: '#8b90a8' }, grid: { color: '#2e3348' }, beginAtZero: true }
         }
     }
 });
-</script>
 {% endif %}
+
+{% set mb = model_breakdown|default([]) %}
+{% if mb|length > 0 %}
+const dOpts = { plugins: { legend: { labels: { color: '#e4e6f0', boxWidth: 12 }, position: 'bottom' } } };
+new Chart(document.getElementById('chartKTokMod'), { type:'doughnut', data:{labels:{{ mb|map(v => v.model_alias)|json_encode|raw }},datasets:[{data:{{ mb|map(v => v.tokens)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+new Chart(document.getElementById('chartKCostMod'), { type:'doughnut', data:{labels:{{ mb|map(v => v.model_alias)|json_encode|raw }},datasets:[{data:{{ mb|map(v => v.cost)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+new Chart(document.getElementById('chartKReqMod'), { type:'doughnut', data:{labels:{{ mb|map(v => v.model_alias)|json_encode|raw }},datasets:[{data:{{ mb|map(v => v.requests)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+{% endif %}
+</script>
 {% endblock %}

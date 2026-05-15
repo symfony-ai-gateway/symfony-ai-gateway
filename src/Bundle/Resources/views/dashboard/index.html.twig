@@ -102,7 +102,7 @@
     <div style="display:flex;gap:12px;margin-top:12px">
     <a href="{{ dash.turl('/dashboard/keys', dashboard_token|default('')) }}" class="btn btn-primary">Manage API Keys</a>
     <a href="{{ dash.turl('/dashboard/teams', dashboard_token|default('')) }}" class="btn btn-primary">Manage Teams</a>
-    <a href="{{ dash.turl('/dashboard/analytics', dashboard_token|default('')) }}" class="btn btn-primary">View Analytics</a>
+    <a href="{{ dash.turl('/dashboard/requests', dashboard_token|default('')) }}" class="btn btn-primary">View Requests</a>
     </div>
 </div>
 {% endblock %}
@@ -113,15 +113,15 @@
 new Chart(document.getElementById('chartDaily'), {
     type: 'bar',
     data: {
-        labels: {{ daily_usage|map(d => d.date)|json_encode|raw }},
+        labels: {{ daily_usage|map(d => d.date)|json_encode(15)|raw }},
         datasets: [{
             label: 'Requests',
-            data: {{ daily_usage|map(d => d.requests)|json_encode|raw }},
+            data: {{ daily_usage|map(d => d.requests)|json_encode(15)|raw }},
             backgroundColor: '#6366f1',
             yAxisID: 'y'
         }, {
             label: 'Cost (USD)',
-            data: {{ daily_usage|map(d => d.cost)|json_encode|raw }},
+            data: {{ daily_usage|map(d => d.cost)|json_encode(15)|raw }},
             backgroundColor: '#f59e0b',
             yAxisID: 'y1'
         }]

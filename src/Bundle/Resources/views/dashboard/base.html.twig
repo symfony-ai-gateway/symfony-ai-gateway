@@ -22,6 +22,7 @@
         .grid{display:grid;gap:16px}
         .grid-4{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
         .grid-2{grid-template-columns:repeat(auto-fill,minmax(400px,1fr))}
+        .grid-3{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
         .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
         .card h3{font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
         .card .value{font-size:28px;font-weight:700}
@@ -67,7 +68,6 @@
         <a href="{{ dash.turl('/dashboard/keys', dashboard_token|default('')) }}" class="{% if '/keys' in app.request.pathInfo %}active{% endif %}">API Keys</a>
         <a href="{{ dash.turl('/dashboard/teams', dashboard_token|default('')) }}" class="{% if '/teams' in app.request.pathInfo %}active{% endif %}">Teams</a>
         <a href="{{ dash.turl('/dashboard/requests', dashboard_token|default('')) }}" class="{% if '/requests' in app.request.pathInfo %}active{% endif %}">Requests</a>
-        <a href="{{ dash.turl('/dashboard/analytics', dashboard_token|default('')) }}" class="{% if '/analytics' in app.request.pathInfo %}active{% endif %}">Analytics</a>
         <a href="{{ dash.turl('/v1/health', dashboard_token|default('')) }}">Health API</a>
         <a href="{{ dash.turl('/v1/metrics', dashboard_token|default('')) }}">Metrics API</a>
     </nav>

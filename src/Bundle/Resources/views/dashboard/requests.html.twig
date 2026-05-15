@@ -10,7 +10,8 @@
 {% block content %}
 <h1 class="page-title">All Requests</h1>
 
-<form method="GET" action="{{ dash.turl('/dashboard/requests', dashboard_token|default('')) }}" style="margin-bottom:24px">
+<form method="GET" action="/dashboard/requests" style="margin-bottom:24px">
+    {% if dashboard_token %}<input type="hidden" name="token" value="{{ dashboard_token }}">{% endif %}
     <div class="card" style="padding:16px">
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
             <div>
@@ -87,16 +88,42 @@
     </div>
 </div>
 
-<div class="grid grid-2" style="margin-bottom:24px">
-    <div class="card">
-        <h3>Models (by cost)</h3>
-        <canvas id="chartFilteredModels" height="180"></canvas>
-    </div>
-    <div class="card">
-        <h3>Status</h3>
-        <canvas id="chartStatus" height="180"></canvas>
+{# ── 9 doughnut charts: tokens/cost/requests × model/key/team ── #}
+{% set chart_groups = [
+    {id: 'tokens', title: 'Tokens'},
+    {id: 'cost', title: 'Cost'},
+    {id: 'requests', title: 'Requests'}
+] %}
+{% set chart_dims = [
+    {id: 'model', title: 'Model'},
+    {id: 'key', title: 'Key'},
+    {id: 'team', title: 'Team'}
+] %}
+
+{% for group in chart_groups %}
+{% set has_any = false %}
+{% for dim in chart_dims %}
+{% set key = group.id ~ '_by_' ~ dim.id %}
+{% if breakdowns[key]|default([])|length > 0 %}{% set has_any = true %}{% endif %}
+{% endfor %}
+{% if has_any %}
+<div class="section">
+    <h2>{{ group.title }}</h2>
+    <div class="grid grid-3" style="margin-bottom:24px">
+    {% for dim in chart_dims %}
+    {% set key = group.id ~ '_by_' ~ dim.id %}
+    {% set chart_data = breakdowns[key]|default([]) %}
+    {% if chart_data|length > 0 %}
+        <div class="card">
+            <h3>{{ group.title }} by {{ dim.title }}</h3>
+            <canvas id="chart{{ group.id|capitalize }}{{ dim.id|capitalize }}" height="180"></canvas>
+        </div>
+    {% endif %}
+    {% endfor %}
     </div>
 </div>
+{% endif %}
+{% endfor %}
 {% endif %}
 
 <div class="card" style="padding:0;overflow:hidden">
@@ -138,7 +165,7 @@
                 </td>
                 <td>
                     {% if r.team_id %}
-                    <a href="{{ dash.turl('/dashboard/teams/' ~ r.team_id, dashboard_token|default('')) }}">{{ r.team_name }}</a>
+                    <a href="{{ dash.turl('/dashboard/teams/' ~ r.team_id, dashboard_token|default('')) }}">{{ team_names[r.team_id] ?? r.team_id }}</a>
                     {% else %}
                     <span style="color:var(--text2)">—</span>
                     {% endif %}
@@ -163,13 +190,15 @@
     </table>
 
     {% if total_pages > 1 %}
+    {% set base_url = dash.turl('/dashboard/requests', dashboard_token|default('')) %}
+    {% set sep = '?' in base_url ? '&' : '?' %}
     <div style="display:flex;justify-content:center;gap:8px;padding:16px;border-top:1px solid var(--border)">
         {% if page > 1 %}
-        <a href="{{ dash.turl('/dashboard/requests', dashboard_token|default('')) }}?page={{ page - 1 }}{% for key, val in {'key_name': filter_key_name, 'team_name': filter_team_name, 'provider': filter_provider, 'model_alias': filter_model_alias, 'status': filter_status, 'error': filter_error, 'date_from': filter_date_from, 'date_to': filter_date_to} %}{% if val %}&{{ key }}={{ val }}{% endif %}{% endfor %}" class="btn" style="background:var(--surface2);color:var(--text);padding:6px 14px;font-size:13px">← Prev</a>
+        <a href="{{ base_url }}{{ sep }}page={{ page - 1 }}{% for key, val in {'key_name': filter_key_name, 'team_name': filter_team_name, 'provider': filter_provider, 'model_alias': filter_model_alias, 'status': filter_status, 'error': filter_error, 'date_from': filter_date_from, 'date_to': filter_date_to} %}{% if val %}&{{ key }}={{ val }}{% endif %}{% endfor %}" class="btn" style="background:var(--surface2);color:var(--text);padding:6px 14px;font-size:13px">← Prev</a>
         {% endif %}
         <span style="padding:6px 14px;color:var(--text2);font-size:13px">{{ page }} / {{ total_pages }}</span>
         {% if page < total_pages %}
-        <a href="{{ dash.turl('/dashboard/requests', dashboard_token|default('')) }}?page={{ page + 1 }}{% for key, val in {'key_name': filter_key_name, 'team_name': filter_team_name, 'provider': filter_provider, 'model_alias': filter_model_alias, 'status': filter_status, 'error': filter_error, 'date_from': filter_date_from, 'date_to': filter_date_to} %}{% if val %}&{{ key }}={{ val }}{% endif %}{% endfor %}" class="btn" style="background:var(--surface2);color:var(--text);padding:6px 14px;font-size:13px">Next →</a>
+        <a href="{{ base_url }}{{ sep }}page={{ page + 1 }}{% for key, val in {'key_name': filter_key_name, 'team_name': filter_team_name, 'provider': filter_provider, 'model_alias': filter_model_alias, 'status': filter_status, 'error': filter_error, 'date_from': filter_date_from, 'date_to': filter_date_to} %}{% if val %}&{{ key }}={{ val }}{% endif %}{% endfor %}" class="btn" style="background:var(--surface2);color:var(--text);padding:6px 14px;font-size:13px">Next →</a>
         {% endif %}
     </div>
     {% endif %}
@@ -179,34 +208,33 @@
 
 {% block scripts %}
 {% if total > 0 %}
+{% set colors = "['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#a855f7']" %}
 <script>
-// Model cost chart
-{% if filtered_model_agg|length > 0 %}
-new Chart(document.getElementById('chartFilteredModels'), {
+{% for group in ['tokens', 'cost', 'requests'] %}
+{% for dim in ['model', 'key', 'team'] %}
+{% set key = group ~ '_by_' ~ dim %}
+{% set chart_data = breakdowns[key]|default([]) %}
+{% if chart_data|length > 0 %}
+new Chart(document.getElementById('chart{{ group|capitalize }}{{ dim|capitalize }}'), {
     type: 'doughnut',
     data: {
-        labels: {{ filtered_model_agg|keys|json_encode|raw }},
+        labels: {{ chart_data|map(v => v.label)|json_encode(15)|raw }},
         datasets: [{
-            data: {{ filtered_model_agg|map(v => v.cost)|json_encode|raw }},
-            backgroundColor: ['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#a855f7']
+            data: {{ chart_data|map(v => v.value)|json_encode(15)|raw }},
+            backgroundColor: {{ colors|raw }}
         }]
     },
-    options: { plugins: { legend: { labels: { color: '#e4e6f0' }, position: 'bottom' } } }
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { labels: { color: '#e4e6f0', boxWidth: 12, padding: 8 }, position: 'bottom' }
+        }
+    }
 });
 {% endif %}
-
-// Status chart
-new Chart(document.getElementById('chartStatus'), {
-    type: 'doughnut',
-    data: {
-        labels: ['Success', 'Error'],
-        datasets: [{
-            data: [{{ summary.requests - summary.errors }}, {{ summary.errors }}],
-            backgroundColor: ['#22c55e', '#ef4444']
-        }]
-    },
-    options: { plugins: { legend: { labels: { color: '#e4e6f0' }, position: 'bottom' } } }
-});
+{% endfor %}
+{% endfor %}
 </script>
 {% endif %}
 {% endblock %}

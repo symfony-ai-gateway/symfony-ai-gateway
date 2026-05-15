@@ -13,107 +13,60 @@
     <a href="{{ dash.turl('/dashboard/teams/' ~ team.id ~ '/edit', dashboard_token|default('')) }}" class="btn btn-primary" style="padding:6px 16px;font-size:13px">Edit</a>
 </div>
 
+{# ── 1. Stats cards ── #}
 <div class="grid grid-4">
-    <div class="card">
-        <h3>Total Requests</h3>
-        <div class="value blue">{{ team_stats.requests|number_format }}</div>
-    </div>
-    <div class="card">
-        <h3>Total Tokens</h3>
-        <div class="value green">{{ team_stats.tokens|number_format }}</div>
-    </div>
-    <div class="card">
-        <h3>Total Cost</h3>
-        <div class="value yellow">${{ team_stats.cost|number_format(4) }}</div>
-    </div>
-    <div class="card">
-        <h3>Errors</h3>
-        <div class="value {% if team_stats.errors > 0 %}red{% else %}green{% endif %}">{{ team_stats.errors }}</div>
-    </div>
+    <div class="card"><h3>Requests</h3><div class="value blue">{{ team_stats.requests|number_format }}</div></div>
+    <div class="card"><h3>Tokens</h3><div class="value green">{{ team_stats.tokens|number_format }}</div></div>
+    <div class="card"><h3>Cost</h3><div class="value yellow">${{ team_stats.cost|number_format(4) }}</div></div>
+    <div class="card"><h3>Errors</h3><div class="value {% if team_stats.errors > 0 %}red{% else %}green{% endif %}">{{ team_stats.errors }}</div></div>
 </div>
 
-<div class="section">
-    <h2>Usage Over Time (30 days)</h2>
-    <div class="card">
-        <canvas id="chartDailyUsage" height="100"></canvas>
-    </div>
-</div>
-
-<div class="grid grid-2">
-    <div class="card">
-        <h3>Cost by Model</h3>
-        <canvas id="chartModelCost" height="200"></canvas>
-    </div>
-    <div class="card">
-        <h3>Cost by Provider</h3>
-        <canvas id="chartProviderCost" height="200"></canvas>
-    </div>
-</div>
-
-<div class="card">
+{# ── 2. Info card ── #}
+<div class="card section">
     <dl class="def-list">
-        <dt>ID</dt>
-        <dd class="mono">{{ team.id }}</dd>
+        <dt>ID</dt><dd class="mono">{{ team.id }}</dd>
         <dt>Parent</dt>
-        <dd>
-            {% if parent_team %}
-                <a href="{{ dash.turl('/dashboard/teams/' ~ parent_team.id, dashboard_token|default('')) }}">{{ parent_team.name }}</a>
-            {% else %}
-                root
-            {% endif %}
-        </dd>
-        <dt>Created</dt>
-        <dd>{{ team.createdAt|date('Y-m-d H:i:s') }}</dd>
+        <dd>{% if parent_team %}<a href="{{ dash.turl('/dashboard/teams/' ~ parent_team.id, dashboard_token|default('')) }}">{{ parent_team.name }}</a>{% else %}root{% endif %}</dd>
+        <dt>Created</dt><dd>{{ team.createdAt|date('Y-m-d H:i:s') }}</dd>
     </dl>
 </div>
 
+{# ── 3. Daily chart ── #}
+{% set du = team_daily_usage|default([]) %}
+{% if du|length > 0 %}
 <div class="section">
-    <h2>Rules</h2>
-    <div class="card">
-        <dl class="def-list">
-            <dt>Budget / Day</dt>
-            <dd>{{ team.rules.budgetPerDay ? '$' ~ team.rules.budgetPerDay|number_format(2) : 'none' }}</dd>
-            <dt>Budget / Month</dt>
-            <dd>{{ team.rules.budgetPerMonth ? '$' ~ team.rules.budgetPerMonth|number_format(2) : 'none' }}</dd>
-            <dt>Rate Limit</dt>
-            <dd>{{ team.rules.rateLimitPerMinute ? team.rules.rateLimitPerMinute ~ ' req/min' : 'none' }}</dd>
-            <dt>Models</dt>
-            <dd>{{ team.rules.models ? team.rules.models|join(', ') : 'all' }}</dd>
-        </dl>
-    </div>
+    <h2>Usage Over Time (30 days)</h2>
+    <div class="card"><canvas id="chartDaily" height="100"></canvas></div>
 </div>
+{% endif %}
 
-{% if ancestry|length > 1 %}
+{# ── 4. Doughnuts: Tokens / Cost / Requests by Model ── #}
+{% set mb = model_breakdown|default([]) %}
+{% if mb|length > 0 %}
 <div class="section">
-    <h2>Ancestry (root → this team)</h2>
-    <div class="card">
-        {% for a in ancestry %}
-        <div style="padding:8px 0;{% if not loop.last %}border-bottom:1px solid var(--border){% endif %}">
-            <span style="color:var(--text2);margin-right:12px">{{ loop.index }}.</span>
-            {% if a.id == team.id %}
-            <strong>{{ a.name }}</strong> <span class="badge badge-green" style="margin-left:8px">current</span>
-            {% else %}
-            <a href="{{ dash.turl('/dashboard/teams/' ~ a.id, dashboard_token|default('')) }}">{{ a.name }}</a>
-            {% endif %}
-        </div>
-        {% endfor %}
+    <h2>Breakdown by Model</h2>
+    <div class="grid grid-3">
+        <div class="card"><h3>Tokens by Model</h3><canvas id="chartTTokMod" height="160"></canvas></div>
+        <div class="card"><h3>Cost by Model</h3><canvas id="chartTCostMod" height="160"></canvas></div>
+        <div class="card"><h3>Requests by Model</h3><canvas id="chartTReqMod" height="160"></canvas></div>
     </div>
 </div>
 {% endif %}
 
-{% if team_model_breakdown|length > 0 %}
+{# ── 5. Breakdown table: Models ── #}
+{% if mb|length > 0 %}
 <div class="section">
-    <h2>Models Used</h2>
+    <h2>Models</h2>
     <div class="card" style="padding:0;overflow:hidden">
         <table>
             <thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Cost</th></tr></thead>
             <tbody>
-            {% for alias, data in team_model_breakdown %}
+            {% for row in mb %}
             <tr>
-                <td><a href="{{ dash.turl('/dashboard/models/' ~ alias, dashboard_token|default('')) }}"><strong>{{ alias }}</strong></a></td>
-                <td>{{ data.requests|number_format }}</td>
-                <td>{{ data.tokens|number_format }}</td>
-                <td style="color:var(--yellow)">${{ data.cost|number_format(4) }}</td>
+                <td><a href="{{ dash.turl('/dashboard/models/' ~ row.model_alias, dashboard_token|default('')) }}"><strong>{{ row.model_alias }}</strong></a></td>
+                <td>{{ row.requests|number_format }}</td>
+                <td>{{ row.tokens|number_format }}</td>
+                <td style="color:var(--yellow)">${{ row.cost|number_format(4) }}</td>
             </tr>
             {% endfor %}
             </tbody>
@@ -122,18 +75,31 @@
 </div>
 {% endif %}
 
-{% if team_provider_breakdown|length > 0 %}
+{# ── 6. Doughnuts: Cost / Requests by Provider ── #}
+{% set pb = provider_breakdown|default([]) %}
+{% if pb|length > 0 %}
 <div class="section">
-    <h2>Providers Used</h2>
+    <h2>Breakdown by Provider</h2>
+    <div class="grid grid-3">
+        <div class="card"><h3>Cost by Provider</h3><canvas id="chartTCostProv" height="160"></canvas></div>
+        <div class="card"><h3>Requests by Provider</h3><canvas id="chartTReqProv" height="160"></canvas></div>
+    </div>
+</div>
+{% endif %}
+
+{# ── 7. Breakdown table: Providers ── #}
+{% if pb|length > 0 %}
+<div class="section">
+    <h2>Providers</h2>
     <div class="card" style="padding:0;overflow:hidden">
         <table>
             <thead><tr><th>Provider</th><th>Requests</th><th>Cost</th></tr></thead>
             <tbody>
-            {% for prov, data in team_provider_breakdown %}
+            {% for row in pb %}
             <tr>
-                <td><a href="{{ dash.turl('/dashboard/providers/' ~ prov, dashboard_token|default('')) }}"><strong>{{ prov }}</strong></a></td>
-                <td>{{ data.requests|number_format }}</td>
-                <td style="color:var(--yellow)">${{ data.cost|number_format(4) }}</td>
+                <td><a href="{{ dash.turl('/dashboard/providers/' ~ row.provider, dashboard_token|default('')) }}"><strong>{{ row.provider }}</strong></a></td>
+                <td>{{ row.requests|number_format }}</td>
+                <td style="color:var(--yellow)">${{ row.cost|number_format(4) }}</td>
             </tr>
             {% endfor %}
             </tbody>
@@ -142,14 +108,28 @@
 </div>
 {% endif %}
 
-{% if member_usage|length > 0 %}
+{# ── 8. Doughnuts: Tokens / Cost / Requests by Key ── #}
+{% set mu = member_usage|default([]) %}
+{% if mu|length > 0 %}
 <div class="section">
-    <h2>Member Usage (sorted by cost)</h2>
+    <h2>Breakdown by Key</h2>
+    <div class="grid grid-3">
+        <div class="card"><h3>Tokens by Key</h3><canvas id="chartTTokKey" height="160"></canvas></div>
+        <div class="card"><h3>Cost by Key</h3><canvas id="chartTCostKey" height="160"></canvas></div>
+        <div class="card"><h3>Requests by Key</h3><canvas id="chartTReqKey" height="160"></canvas></div>
+    </div>
+</div>
+{% endif %}
+
+{# ── 9. Breakdown table: Keys ── #}
+{% if mu|length > 0 %}
+<div class="section">
+    <h2>API Keys</h2>
     <div class="card" style="padding:0;overflow:hidden">
         <table>
             <thead><tr><th>Key</th><th>Requests</th><th>Tokens</th><th>Cost</th></tr></thead>
             <tbody>
-            {% for m in member_usage %}
+            {% for m in mu %}
             <tr>
                 <td><a href="{{ dash.turl('/dashboard/keys/' ~ m.key_id, dashboard_token|default('')) }}">{{ m.key_name }}</a></td>
                 <td>{{ m.requests|number_format }}</td>
@@ -163,6 +143,46 @@
 </div>
 {% endif %}
 
+{# ── 10. Recent Requests ── #}
+{% set rl = recent_logs|default([]) %}
+{% if rl|length > 0 %}
+<div class="section">
+    <h2>Recent Requests ({{ team_stats.requests|number_format }} total)</h2>
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>Time</th><th>Key</th><th>Model</th><th>Provider</th><th>Tokens</th><th>Cost</th><th>Duration</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for log in rl %}
+            <tr>
+                <td class="mono" style="font-size:12px">{{ log.created_at|date('Y-m-d H:i') }}</td>
+                <td>{% if log.key_id %}<a href="{{ dash.turl('/dashboard/keys/' ~ log.key_id, dashboard_token|default('')) }}">{{ log.key_name }}</a>{% else %}<span style="color:var(--text2)">—</span>{% endif %}</td>
+                <td><a href="{{ dash.turl('/dashboard/models/' ~ log.model_alias, dashboard_token|default('')) }}">{{ log.model_alias }}</a></td>
+                <td><a href="{{ dash.turl('/dashboard/providers/' ~ log.provider, dashboard_token|default('')) }}">{{ log.provider }}</a></td>
+                <td>{{ log.total_tokens|number_format }} <span style="color:var(--text2);font-size:12px">({{ log.prompt_tokens }}↑ {{ log.completion_tokens }}↓)</span></td>
+                <td style="color:var(--yellow)">${{ log.cost_usd|number_format(6) }}</td>
+                <td>{{ log.duration_ms|number_format(1) }}ms</td>
+                <td>{% if log.cached %}<span class="badge badge-green">cached</span>{% elseif log.status_code >= 400 %}<span class="badge badge-red">{{ log.status_code }}</span>{% else %}<span class="badge badge-green">{{ log.status_code }}</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{# ── 11. Rules & Ancestry ── #}
+<div class="section">
+    <h2>Rules</h2>
+    <div class="card">
+        <dl class="def-list">
+            <dt>Budget / Day</dt><dd>{{ team.rules.budgetPerDay ? '$' ~ team.rules.budgetPerDay|number_format(2) : 'none' }}</dd>
+            <dt>Budget / Month</dt><dd>{{ team.rules.budgetPerMonth ? '$' ~ team.rules.budgetPerMonth|number_format(2) : 'none' }}</dd>
+            <dt>Rate Limit</dt><dd>{{ team.rules.rateLimitPerMinute ? team.rules.rateLimitPerMinute ~ ' req/min' : 'none' }}</dd>
+            <dt>Models</dt><dd>{{ team.rules.models ? team.rules.models|join(', ') : 'all' }}</dd>
+        </dl>
+    </div>
+</div>
+
 {% if team_keys|length > 0 %}
 <div class="section">
     <h2>Keys in this team ({{ team_keys|length }})</h2>
@@ -174,13 +194,7 @@
             <tr>
                 <td><a href="{{ dash.turl('/dashboard/keys/' ~ k.id, dashboard_token|default('')) }}">{{ k.name }}</a></td>
                 <td class="mono">{{ k.tokenPrefix }}...</td>
-                <td>
-                    {% if k.enabled %}
-                    <span class="badge badge-green">active</span>
-                    {% else %}
-                    <span class="badge badge-red">revoked</span>
-                    {% endif %}
-                </td>
+                <td>{% if k.enabled %}<span class="badge badge-green">active</span>{% else %}<span class="badge badge-red">revoked</span>{% endif %}</td>
                 <td><a href="{{ dash.turl('/dashboard/keys/' ~ k.id, dashboard_token|default('')) }}">view →</a></td>
             </tr>
             {% endfor %}
@@ -191,30 +205,25 @@
 {% endif %}
 
 {% if team_stats.requests == 0 %}
-<div class="empty">
-    <h3>No usage data yet</h3>
-    <p>Send requests using keys from this team to see analytics.</p>
-</div>
+<div class="empty"><h3>No usage data yet</h3><p>Send requests using keys from this team to see analytics.</p></div>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
-{% if team_daily_usage|length > 0 %}
 <script>
-new Chart(document.getElementById('chartDailyUsage'), {
+const colors = ['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#a855f7'];
+const dOpts = { plugins: { legend: { labels: { color: '#e4e6f0', boxWidth: 12 }, position: 'bottom' } } };
+
+{% set du = team_daily_usage|default([]) %}
+{% if du|length > 0 %}
+new Chart(document.getElementById('chartDaily'), {
     type: 'bar',
     data: {
-        labels: {{ team_daily_usage|map(d => d.date)|json_encode|raw }},
+        labels: {{ du|map(d => d.date)|json_encode(15)|raw }},
         datasets: [{
-            label: 'Requests',
-            data: {{ team_daily_usage|map(d => d.requests)|json_encode|raw }},
-            backgroundColor: '#6366f1',
-            yAxisID: 'y'
+            label: 'Requests', data: {{ du|map(d => d.requests)|json_encode(15)|raw }}, backgroundColor: '#6366f1', yAxisID: 'y'
         }, {
-            label: 'Cost (USD)',
-            data: {{ team_daily_usage|map(d => d.cost)|json_encode|raw }},
-            backgroundColor: '#f59e0b',
-            yAxisID: 'y1'
+            label: 'Cost (USD)', data: {{ du|map(d => d.cost)|json_encode(15)|raw }}, backgroundColor: '#f59e0b', yAxisID: 'y1'
         }]
     },
     options: {
@@ -226,38 +235,26 @@ new Chart(document.getElementById('chartDailyUsage'), {
         }
     }
 });
-</script>
 {% endif %}
 
-{% if team_model_breakdown|length > 0 %}
-<script>
-new Chart(document.getElementById('chartModelCost'), {
-    type: 'doughnut',
-    data: {
-        labels: {{ team_model_breakdown|keys|json_encode|raw }},
-        datasets: [{
-            data: {{ team_model_breakdown|map(v => v.cost)|json_encode|raw }},
-            backgroundColor: ['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#a855f7']
-        }]
-    },
-    options: { plugins: { legend: { labels: { color: '#e4e6f0' }, position: 'bottom' } } }
-});
-</script>
+{% set mb = model_breakdown|default([]) %}
+{% if mb|length > 0 %}
+new Chart(document.getElementById('chartTTokMod'), { type:'doughnut', data:{labels:{{ mb|map(v => v.model_alias)|json_encode|raw }},datasets:[{data:{{ mb|map(v => v.tokens)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+new Chart(document.getElementById('chartTCostMod'), { type:'doughnut', data:{labels:{{ mb|map(v => v.model_alias)|json_encode|raw }},datasets:[{data:{{ mb|map(v => v.cost)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+new Chart(document.getElementById('chartTReqMod'), { type:'doughnut', data:{labels:{{ mb|map(v => v.model_alias)|json_encode|raw }},datasets:[{data:{{ mb|map(v => v.requests)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
 {% endif %}
 
-{% if team_provider_breakdown|length > 0 %}
-<script>
-new Chart(document.getElementById('chartProviderCost'), {
-    type: 'doughnut',
-    data: {
-        labels: {{ team_provider_breakdown|keys|json_encode|raw }},
-        datasets: [{
-            data: {{ team_provider_breakdown|map(v => v.cost)|json_encode|raw }},
-            backgroundColor: ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899']
-        }]
-    },
-    options: { plugins: { legend: { labels: { color: '#e4e6f0' }, position: 'bottom' } } }
-});
-</script>
+{% set pb = provider_breakdown|default([]) %}
+{% if pb|length > 0 %}
+new Chart(document.getElementById('chartTCostProv'), { type:'doughnut', data:{labels:{{ pb|map(v => v.provider)|json_encode|raw }},datasets:[{data:{{ pb|map(v => v.cost)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+new Chart(document.getElementById('chartTReqProv'), { type:'doughnut', data:{labels:{{ pb|map(v => v.provider)|json_encode|raw }},datasets:[{data:{{ pb|map(v => v.requests)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
 {% endif %}
+
+{% set mu = member_usage|default([]) %}
+{% if mu|length > 0 %}
+new Chart(document.getElementById('chartTTokKey'), { type:'doughnut', data:{labels:{{ mu|map(v => v.key_name ? v.key_name : v.key_id)|json_encode|raw }},datasets:[{data:{{ mu|map(v => v.tokens)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+new Chart(document.getElementById('chartTCostKey'), { type:'doughnut', data:{labels:{{ mu|map(v => v.key_name ? v.key_name : v.key_id)|json_encode|raw }},datasets:[{data:{{ mu|map(v => v.cost)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+new Chart(document.getElementById('chartTReqKey'), { type:'doughnut', data:{labels:{{ mu|map(v => v.key_name ? v.key_name : v.key_id)|json_encode|raw }},datasets:[{data:{{ mu|map(v => v.requests)|json_encode|raw }},backgroundColor:colors}]}, options:dOpts });
+{% endif %}
+</script>
 {% endblock %}

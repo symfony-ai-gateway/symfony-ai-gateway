@@ -341,6 +341,43 @@ final class RequestLogStore
     // ── Filtered daily usage (fix: was using global data) ────────────────────
 
     /**
+     * @return list<array<string, mixed>>
+     */
+    public function getModelLogs(string $modelAlias, int $limit = 50, int $offset = 0): array
+    {
+        return $this->connection->fetchAllAssociative(
+            'SELECT * FROM gateway_request_log WHERE model_alias = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            [$modelAlias, $limit, $offset],
+        );
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function getProviderLogs(string $provider, int $limit = 50, int $offset = 0): array
+    {
+        return $this->connection->fetchAllAssociative(
+            'SELECT * FROM gateway_request_log WHERE provider = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+            [$provider, $limit, $offset],
+        );
+    }
+
+    /**
+     * @return list<array{date: string, model_alias: string, requests: int}>
+     */
+    public function getKeyDailyUsageByModel(string $keyId, int $days = 30): array
+    {
+        $since = time() - ($days * 86400);
+
+        return $this->connection->fetchAllAssociative(
+            "SELECT date(created_at, 'unixepoch') as date, model_alias, CAST(COUNT(*) AS INTEGER) as requests
+             FROM gateway_request_log WHERE key_id = ? AND created_at >= ?
+             GROUP BY date, model_alias ORDER BY date ASC, requests DESC",
+            [$keyId, $since],
+        );
+    }
+
+    /**
      * @return list<array{date: string, requests: int, tokens: int, cost: float}>
      */
     public function getKeyDailyUsage(string $keyId, int $days = 30): array
@@ -365,6 +402,30 @@ final class RequestLogStore
             "SELECT date(created_at, 'unixepoch') as date, COUNT(*) as requests, SUM(total_tokens) as tokens, SUM(cost_usd) as cost
              FROM gateway_request_log WHERE team_id = ? AND created_at >= ? GROUP BY date ORDER BY date ASC",
             [$teamId, $since],
+        );
+    }
+
+    /**
+     * @return list<array{model_alias: string, requests: int, tokens: int, cost: float}>
+     */
+    public function getTeamModelBreakdown(string $teamId): array
+    {
+        return $this->connection->fetchAllAssociative(
+            'SELECT model_alias, COUNT(*) as requests, SUM(total_tokens) as tokens, SUM(cost_usd) as cost
+             FROM gateway_request_log WHERE team_id = ? GROUP BY model_alias ORDER BY cost DESC',
+            [$teamId],
+        );
+    }
+
+    /**
+     * @return list<array{provider: string, requests: int, cost: float}>
+     */
+    public function getTeamProviderBreakdown(string $teamId): array
+    {
+        return $this->connection->fetchAllAssociative(
+            'SELECT provider, COUNT(*) as requests, SUM(cost_usd) as cost
+             FROM gateway_request_log WHERE team_id = ? GROUP BY provider ORDER BY cost DESC',
+            [$teamId],
         );
     }
 
@@ -415,6 +476,111 @@ final class RequestLogStore
      * @return array{rows: list<array<string, mixed>>, total: int, summary: array{requests: int, tokens: int, cost: float, errors: int}}
      */
     public function searchRequests(array $filters = [], int $limit = 50, int $offset = 0): array
+    {
+        [$where, $params] = $this->buildSearchWhere($filters);
+
+        $total = (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM gateway_request_log WHERE {$where}",
+            $params,
+        );
+
+        $rows = $total > 0
+            ? $this->connection->fetchAllAssociative(
+                "SELECT * FROM gateway_request_log WHERE {$where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                [...$params, $limit, $offset],
+            )
+            : [];
+
+        $summary = $this->aggregateByWhere($where, $params);
+
+        return [
+            'rows' => $rows,
+            'total' => $total,
+            'summary' => $summary,
+        ];
+    }
+
+    /**
+     * Get 9 breakdowns (tokens/cost/requests × model/key/team) for filtered requests.
+     *
+     * @param array{key_id?: string, key_name?: string, team_id?: string, team_name?: string, provider?: string, model_alias?: string, status_code_min?: int, status_code_max?: int, date_from?: int, date_to?: int, error?: string} $filters
+     *
+     * @return array{tokens_by_model: list<array{label: string, value: float}>, tokens_by_key: list<array{label: string, value: float}>, tokens_by_team: list<array{label: string, value: float}>, cost_by_model: list<array{label: string, value: float}>, cost_by_key: list<array{label: string, value: float}>, cost_by_team: list<array{label: string, value: float}>, requests_by_model: list<array{label: string, value: float}>, requests_by_key: list<array{label: string, value: float}>, requests_by_team: list<array{label: string, value: float}>}
+     */
+    public function getFilteredBreakdowns(array $filters = [], int $limit = 10): array
+    {
+        [$where, $params] = $this->buildSearchWhere($filters);
+
+        $exec = function (string $select, string $extraWhere = '') use ($where, $params, $limit): array {
+            $fullWhere = $where;
+            $fullParams = $params;
+            if ('' !== $extraWhere) {
+                $fullWhere .= ' AND '.$extraWhere;
+            }
+
+            return $this->connection->fetchAllAssociative(
+                "SELECT {$select} FROM gateway_request_log WHERE {$fullWhere} GROUP BY label ORDER BY value DESC LIMIT ?",
+                [...$fullParams, $limit],
+            );
+        };
+
+        $tokensByModel = $exec(
+            "COALESCE(NULLIF(model_alias, ''), '(unknown)') as label, CAST(SUM(total_tokens) AS REAL) as value",
+        );
+        $tokensByKey = $exec(
+            "COALESCE(NULLIF(key_name, ''), '(unknown)') as label, CAST(SUM(total_tokens) AS REAL) as value",
+            'key_id IS NOT NULL',
+        );
+        $tokensByTeam = $exec(
+            "COALESCE(NULLIF(team_id, ''), '(unknown)') as label, CAST(SUM(total_tokens) AS REAL) as value",
+            'team_id IS NOT NULL',
+        );
+
+        $costByModel = $exec(
+            "COALESCE(NULLIF(model_alias, ''), '(unknown)') as label, CAST(SUM(cost_usd) AS REAL) as value",
+        );
+        $costByKey = $exec(
+            "COALESCE(NULLIF(key_name, ''), '(unknown)') as label, CAST(SUM(cost_usd) AS REAL) as value",
+            'key_id IS NOT NULL',
+        );
+        $costByTeam = $exec(
+            "COALESCE(NULLIF(team_id, ''), '(unknown)') as label, CAST(SUM(cost_usd) AS REAL) as value",
+            'team_id IS NOT NULL',
+        );
+
+        $requestsByModel = $exec(
+            "COALESCE(NULLIF(model_alias, ''), '(unknown)') as label, CAST(COUNT(*) AS REAL) as value",
+        );
+        $requestsByKey = $exec(
+            "COALESCE(NULLIF(key_name, ''), '(unknown)') as label, CAST(COUNT(*) AS REAL) as value",
+            'key_id IS NOT NULL',
+        );
+        $requestsByTeam = $exec(
+            "COALESCE(NULLIF(team_id, ''), '(unknown)') as label, CAST(COUNT(*) AS REAL) as value",
+            'team_id IS NOT NULL',
+        );
+
+        return [
+            'tokens_by_model' => $tokensByModel,
+            'tokens_by_key' => $tokensByKey,
+            'tokens_by_team' => $tokensByTeam,
+            'cost_by_model' => $costByModel,
+            'cost_by_key' => $costByKey,
+            'cost_by_team' => $costByTeam,
+            'requests_by_model' => $requestsByModel,
+            'requests_by_key' => $requestsByKey,
+            'requests_by_team' => $requestsByTeam,
+        ];
+    }
+
+    /**
+     * Build WHERE clause and params from filters.
+     *
+     * @param array{key_id?: string, key_name?: string, team_id?: string, team_name?: string, provider?: string, model_alias?: string, status_code_min?: int, status_code_max?: int, date_from?: int, date_to?: int, error?: string} $filters
+     *
+     * @return array{0: string, 1: list<mixed>}
+     */
+    private function buildSearchWhere(array $filters): array
     {
         $where = '1 = 1';
         $params = [];
@@ -469,25 +635,7 @@ final class RequestLogStore
             }
         }
 
-        $total = (int) $this->connection->fetchOne(
-            "SELECT COUNT(*) FROM gateway_request_log WHERE {$where}",
-            $params,
-        );
-
-        $rows = $total > 0
-            ? $this->connection->fetchAllAssociative(
-                "SELECT * FROM gateway_request_log WHERE {$where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                [...$params, $limit, $offset],
-            )
-            : [];
-
-        $summary = $this->aggregateByWhere($where, $params);
-
-        return [
-            'rows' => $rows,
-            'total' => $total,
-            'summary' => $summary,
-        ];
+        return [$where, $params];
     }
 
     /**

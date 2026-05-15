@@ -146,6 +146,7 @@ final class DashboardController
         $modelBreakdown = $this->requestLogStore?->getProviderModelBreakdown($name) ?? [];
         $topKeys = $this->requestLogStore?->getProviderTopKeys($name, 10) ?? [];
         $dailyUsage = $this->requestLogStore?->getProviderDailyUsage($name, 60) ?? [];
+        $recentLogs = $this->requestLogStore?->getProviderLogs($name, 20) ?? [];
 
         return new Response($this->twig->render('@AIGateway/dashboard/providers_detail.html.twig', $this->params($request, [
             'provider' => $provider,
@@ -153,6 +154,7 @@ final class DashboardController
             'model_breakdown' => $modelBreakdown,
             'top_keys' => $topKeys,
             'daily_usage' => $dailyUsage,
+            'recent_logs' => $recentLogs,
         ])));
     }
 
@@ -259,6 +261,7 @@ final class DashboardController
         $teamBreakdown = $this->requestLogStore?->getModelTeamBreakdown($alias) ?? [];
         $keyBreakdown = $this->requestLogStore?->getModelKeyBreakdown($alias) ?? [];
         $dailyUsage = $this->requestLogStore?->getModelDailyUsage($alias, 60) ?? [];
+        $recentLogs = $this->requestLogStore?->getModelLogs($alias, 20) ?? [];
 
         return new Response($this->twig->render('@AIGateway/dashboard/models_detail.html.twig', $this->params($request, [
             'model' => $model,
@@ -266,6 +269,7 @@ final class DashboardController
             'team_breakdown' => $teamBreakdown,
             'key_breakdown' => $keyBreakdown,
             'daily_usage' => $dailyUsage,
+            'recent_logs' => $recentLogs,
         ])));
     }
 
@@ -390,6 +394,28 @@ final class DashboardController
         $recentLogs = $this->requestLogStore?->getKeyLogs($id, 20) ?? [];
         $keyDailyUsage = $this->requestLogStore?->getKeyDailyUsage($id, 30) ?? [];
 
+        // Build stacked bar data: requests per day, stacked by model
+        $dailyByModel = $this->requestLogStore?->getKeyDailyUsageByModel($id, 30) ?? [];
+        $dailyDates = [];
+        $dailyModelBuckets = [];
+        foreach ($dailyByModel as $row) {
+            $date = $row['date'];
+            $model = $row['model_alias'];
+            $count = (int) $row['requests'];
+            if (!in_array($date, $dailyDates, true)) {
+                $dailyDates[] = $date;
+            }
+            $dailyModelBuckets[$model][$date] = ($dailyModelBuckets[$model][$date] ?? 0) + $count;
+        }
+        $dailyModelDatasets = [];
+        foreach ($dailyModelBuckets as $model => $buckets) {
+            $aligned = [];
+            foreach ($dailyDates as $date) {
+                $aligned[] = $buckets[$date] ?? 0;
+            }
+            $dailyModelDatasets[] = ['label' => $model, 'data' => $aligned];
+        }
+
         // Get team-relative stats
         $teamStats = null !== $key->teamId ? ($this->requestLogStore?->getTeamStats($key->teamId) ?? null) : null;
         $keySharePct = null;
@@ -416,6 +442,8 @@ final class DashboardController
             'model_breakdown' => $modelBreakdown,
             'recent_logs' => $recentLogs,
             'key_daily_usage' => $keyDailyUsage,
+            'daily_dates' => $dailyDates,
+            'daily_model_datasets' => $dailyModelDatasets,
             'team_stats' => $teamStats,
             'key_share_pct' => $keySharePct,
             'providers' => $providers,
@@ -594,29 +622,11 @@ final class DashboardController
         $parentTeam = null !== $team->parentId ? $this->keyStore?->findTeamById($team->parentId) : null;
 
         $teamStats = $this->requestLogStore?->getTeamStats($id) ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
-        $memberUsage = $this->requestLogStore?->getTeamMemberUsage($id) ?? [];
         $teamDailyUsage = $this->requestLogStore?->getTeamDailyUsage($id, 30) ?? [];
-        $teamLogs = $this->requestLogStore?->getTeamLogs($id, 5000) ?? [];
-
-        // Build model breakdown for this team from raw logs
-        $modelAgg = [];
-        $providerAgg = [];
-        foreach ($teamLogs as $log) {
-            /** @var array{model_alias: string, total_tokens: int, cost_usd: float, provider: string} $log */
-            $mAlias = $log['model_alias'];
-            $modelAgg[$mAlias] ??= ['requests' => 0, 'tokens' => 0, 'cost' => 0.0];
-            ++$modelAgg[$mAlias]['requests'];
-            $modelAgg[$mAlias]['tokens'] += $log['total_tokens'];
-            $modelAgg[$mAlias]['cost'] += $log['cost_usd'];
-
-            $prov = $log['provider'];
-            $providerAgg[$prov] ??= ['requests' => 0, 'cost' => 0.0];
-            ++$providerAgg[$prov]['requests'];
-            $providerAgg[$prov]['cost'] += $log['cost_usd'];
-        }
-        // Sort models by cost desc
-        uasort($modelAgg, static fn (array $a, array $b): int => $b['cost'] <=> $a['cost']);
-        uasort($providerAgg, static fn (array $a, array $b): int => $b['cost'] <=> $a['cost']);
+        $modelBreakdown = $this->requestLogStore?->getTeamModelBreakdown($id) ?? [];
+        $providerBreakdown = $this->requestLogStore?->getTeamProviderBreakdown($id) ?? [];
+        $memberUsage = $this->requestLogStore?->getTeamMemberUsage($id) ?? [];
+        $recentLogs = $this->requestLogStore?->getTeamLogs($id, 20) ?? [];
 
         return new Response($this->twig->render('@AIGateway/dashboard/teams_detail.html.twig', $this->params($request, [
             'team' => $team,
@@ -624,10 +634,11 @@ final class DashboardController
             'ancestry' => $ancestry,
             'team_keys' => $teamKeys,
             'team_stats' => $teamStats,
-            'member_usage' => $memberUsage,
             'team_daily_usage' => $teamDailyUsage,
-            'team_model_breakdown' => $modelAgg,
-            'team_provider_breakdown' => $providerAgg,
+            'model_breakdown' => $modelBreakdown,
+            'provider_breakdown' => $providerBreakdown,
+            'member_usage' => $memberUsage,
+            'recent_logs' => $recentLogs,
         ])));
     }
 
@@ -729,14 +740,31 @@ final class DashboardController
         $allProviders = $this->configStore?->listProviders() ?? [];
         $allModels = $this->configStore?->listModels() ?? [];
 
+        // Build team name lookup (team_name is not stored in log, display from key store)
+        $allTeams = $this->keyStore?->listTeams() ?? [];
+        $teamNames = [];
+        foreach ($allTeams as $t) {
+            $teamNames[$t->id] = $t->name;
+        }
+
         $summary = $result['summary'];
-        // Top models from filtered results for chart
-        $filteredModelAgg = [];
-        foreach ($result['rows'] as $r) {
-            $m = $r['model_alias'];
-            $filteredModelAgg[$m] ??= ['requests' => 0, 'cost' => 0.0];
-            ++$filteredModelAgg[$m]['requests'];
-            $filteredModelAgg[$m]['cost'] += (float) $r['cost_usd'];
+
+        // Get 9 filtered breakdowns for charts (tokens/cost/requests × model/key/team)
+        $breakdowns = $this->requestLogStore?->getFilteredBreakdowns($filters, 10)
+            ?? [
+                'tokens_by_model' => [], 'tokens_by_key' => [], 'tokens_by_team' => [],
+                'cost_by_model' => [], 'cost_by_key' => [], 'cost_by_team' => [],
+                'requests_by_model' => [], 'requests_by_key' => [], 'requests_by_team' => [],
+            ];
+
+        // Resolve team IDs to names in team breakdowns
+        foreach (['tokens_by_team', 'cost_by_team', 'requests_by_team'] as $key) {
+            foreach ($breakdowns[$key] as $i => $item) {
+                $label = $item['label'];
+                if (isset($teamNames[$label])) {
+                    $breakdowns[$key][$i]['label'] = $teamNames[$label];
+                }
+            }
         }
 
         return new Response($this->twig->render('@AIGateway/dashboard/requests.html.twig', $this->params($request, [
@@ -745,7 +773,7 @@ final class DashboardController
             'total_pages' => $totalPages,
             'page' => $page,
             'summary' => $summary,
-            'filtered_model_agg' => $filteredModelAgg,
+            'breakdowns' => $breakdowns,
             'filter_key_name' => $keyName,
             'filter_team_name' => $teamName,
             'filter_provider' => $provider,
@@ -756,41 +784,14 @@ final class DashboardController
             'filter_date_to' => $dateTo,
             'all_providers' => $allProviders,
             'all_models' => $allModels,
+            'team_names' => $teamNames,
         ])));
     }
 
     #[Route('/dashboard/analytics', name: 'ai_gateway_dashboard_analytics', methods: ['GET'])]
     public function analytics(Request $request): Response
     {
-        $globalStats = $this->requestLogStore?->getGlobalStats() ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
-        $topModels = $this->requestLogStore?->getTopModels(10) ?? [];
-        $topProviders = $this->requestLogStore?->getTopProviders(10) ?? [];
-        $topKeys = $this->requestLogStore?->getTopKeys(10) ?? [];
-        $topTeams = $this->requestLogStore?->getTopTeams(10) ?? [];
-        $dailyUsage = $this->requestLogStore?->getDailyUsage(30) ?? [];
-
-        // Build provider request counts for chart
-        $byProvider = [];
-        foreach ($topProviders as $p) {
-            $byProvider[$p['provider']] = $p['requests'];
-        }
-
-        // Build model cost map for chart
-        $byModel = [];
-        foreach ($topModels as $m) {
-            $byModel[$m['model_alias']] = ['requests' => $m['requests'], 'cost' => $m['cost']];
-        }
-
-        return new Response($this->twig->render('@AIGateway/dashboard/analytics.html.twig', $this->params($request, [
-            'global_stats' => $globalStats,
-            'top_models' => $topModels,
-            'top_providers' => $topProviders,
-            'top_keys' => $topKeys,
-            'top_teams' => $topTeams,
-            'daily_usage' => $dailyUsage,
-            'by_provider' => $byProvider,
-            'by_model' => $byModel,
-        ])));
+        return new RedirectResponse($this->url($request, '/dashboard/requests'));
     }
 
     /**
