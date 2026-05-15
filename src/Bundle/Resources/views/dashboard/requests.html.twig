@@ -1,0 +1,212 @@
+{% extends "@AIGateway/dashboard/base.html.twig" %}
+{% import "@AIGateway/dashboard/base.html.twig" as dash %}
+
+{% block title %}AIGateway Dashboard — Requests{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">All Requests</h1>
+
+<form method="GET" action="{{ dash.turl('/dashboard/requests', dashboard_token|default('')) }}" style="margin-bottom:24px">
+    <div class="card" style="padding:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+            <div>
+                <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:4px">Key Name</label>
+                <input type="text" name="key_name" value="{{ filter_key_name }}" placeholder="Search key..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px">
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:4px">Team Name</label>
+                <input type="text" name="team_name" value="{{ filter_team_name }}" placeholder="Search team..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px">
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:4px">Provider</label>
+                <select name="provider" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px">
+                    <option value="">All</option>
+                    {% for p in all_providers %}
+                    <option value="{{ p.name }}" {% if filter_provider == p.name %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:4px">Model</label>
+                <select name="model_alias" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px">
+                    <option value="">All</option>
+                    {% for m in all_models %}
+                    <option value="{{ m.alias }}" {% if filter_model_alias == m.alias %}selected{% endif %}>{{ m.alias }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:4px">Status</label>
+                <select name="status" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px">
+                    <option value="">All</option>
+                    <option value="success" {% if filter_status == 'success' %}selected{% endif %}>Success only</option>
+                    <option value="error" {% if filter_status == 'error' %}selected{% endif %}>Errors only</option>
+                </select>
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:4px">Error Type</label>
+                <input type="text" name="error" value="{{ filter_error }}" placeholder="Search error..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px">
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:4px">From (date)</label>
+                <input type="date" name="date_from" value="{{ filter_date_from }}" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px">
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:4px">To (date)</label>
+                <input type="date" name="date_to" value="{{ filter_date_to }}" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:13px">
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+            <button type="submit" class="btn btn-primary" style="padding:8px 20px;font-size:13px">Apply Filters</button>
+            <a href="{{ dash.turl('/dashboard/requests', dashboard_token|default('')) }}" class="btn" style="background:var(--surface2);color:var(--text);padding:8px 20px;font-size:13px">Reset</a>
+        </div>
+    </div>
+</form>
+
+{% if total > 0 %}
+<div class="grid grid-4" style="margin-bottom:24px">
+    <div class="card">
+        <h3>Filtered Requests</h3>
+        <div class="value blue">{{ summary.requests|number_format }}</div>
+    </div>
+    <div class="card">
+        <h3>Filtered Tokens</h3>
+        <div class="value green">{{ summary.tokens|number_format }}</div>
+    </div>
+    <div class="card">
+        <h3>Filtered Cost</h3>
+        <div class="value yellow">${{ summary.cost|number_format(4) }}</div>
+    </div>
+    <div class="card">
+        <h3>Filtered Errors</h3>
+        <div class="value {% if summary.errors > 0 %}red{% else %}green{% endif %}">{{ summary.errors }}</div>
+    </div>
+</div>
+
+<div class="grid grid-2" style="margin-bottom:24px">
+    <div class="card">
+        <h3>Models (by cost)</h3>
+        <canvas id="chartFilteredModels" height="180"></canvas>
+    </div>
+    <div class="card">
+        <h3>Status</h3>
+        <canvas id="chartStatus" height="180"></canvas>
+    </div>
+</div>
+{% endif %}
+
+<div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:12px 16px;background:var(--surface2);font-size:13px;color:var(--text2);border-bottom:1px solid var(--border)">
+        {{ total }} request{% if total != 1 %}s{% endif %} found
+        {% if total > 50 %} · Page {{ page }} / {{ total_pages }}{% endif %}
+    </div>
+
+    {% if rows|length == 0 %}
+    <div class="empty">
+        <h3>No requests found</h3>
+        <p>Try adjusting your filters to see more results.</p>
+    </div>
+    {% else %}
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Key</th>
+                <th>Team</th>
+                <th>Provider</th>
+                <th>Model</th>
+                <th>Tokens</th>
+                <th>Cost</th>
+                <th>Duration</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+            <tr>
+                <td class="mono" style="font-size:12px;white-space:nowrap">{{ r.created_at|date('Y-m-d H:i') }}</td>
+                <td>
+                    {% if r.key_id %}
+                    <a href="{{ dash.turl('/dashboard/keys/' ~ r.key_id, dashboard_token|default('')) }}">{{ r.key_name }}</a>
+                    {% else %}
+                    <span style="color:var(--text2)">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if r.team_id %}
+                    <a href="{{ dash.turl('/dashboard/teams/' ~ r.team_id, dashboard_token|default('')) }}">{{ r.team_name }}</a>
+                    {% else %}
+                    <span style="color:var(--text2)">—</span>
+                    {% endif %}
+                </td>
+                <td><a href="{{ dash.turl('/dashboard/providers/' ~ r.provider, dashboard_token|default('')) }}">{{ r.provider }}</a></td>
+                <td><a href="{{ dash.turl('/dashboard/models/' ~ r.model_alias, dashboard_token|default('')) }}">{{ r.model_alias }}</a></td>
+                <td>{{ r.total_tokens|number_format }} <span style="color:var(--text2);font-size:11px">({{ r.prompt_tokens }}↑ {{ r.completion_tokens }}↓)</span></td>
+                <td style="color:var(--yellow);white-space:nowrap">${{ r.cost_usd|number_format(6) }}</td>
+                <td style="white-space:nowrap">{{ r.duration_ms|number_format(1) }}ms</td>
+                <td>
+                    {% if r.cached %}
+                    <span class="badge badge-green">cached</span>
+                    {% elseif r.status_code >= 400 or r.error is not null %}
+                    <span class="badge badge-red" title="{{ r.error }}">{{ r.status_code }}</span>
+                    {% else %}
+                    <span class="badge badge-green">{{ r.status_code }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% if total_pages > 1 %}
+    <div style="display:flex;justify-content:center;gap:8px;padding:16px;border-top:1px solid var(--border)">
+        {% if page > 1 %}
+        <a href="{{ dash.turl('/dashboard/requests', dashboard_token|default('')) }}?page={{ page - 1 }}{% for key, val in {'key_name': filter_key_name, 'team_name': filter_team_name, 'provider': filter_provider, 'model_alias': filter_model_alias, 'status': filter_status, 'error': filter_error, 'date_from': filter_date_from, 'date_to': filter_date_to} %}{% if val %}&{{ key }}={{ val }}{% endif %}{% endfor %}" class="btn" style="background:var(--surface2);color:var(--text);padding:6px 14px;font-size:13px">← Prev</a>
+        {% endif %}
+        <span style="padding:6px 14px;color:var(--text2);font-size:13px">{{ page }} / {{ total_pages }}</span>
+        {% if page < total_pages %}
+        <a href="{{ dash.turl('/dashboard/requests', dashboard_token|default('')) }}?page={{ page + 1 }}{% for key, val in {'key_name': filter_key_name, 'team_name': filter_team_name, 'provider': filter_provider, 'model_alias': filter_model_alias, 'status': filter_status, 'error': filter_error, 'date_from': filter_date_from, 'date_to': filter_date_to} %}{% if val %}&{{ key }}={{ val }}{% endif %}{% endfor %}" class="btn" style="background:var(--surface2);color:var(--text);padding:6px 14px;font-size:13px">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if total > 0 %}
+<script>
+// Model cost chart
+{% if filtered_model_agg|length > 0 %}
+new Chart(document.getElementById('chartFilteredModels'), {
+    type: 'doughnut',
+    data: {
+        labels: {{ filtered_model_agg|keys|json_encode|raw }},
+        datasets: [{
+            data: {{ filtered_model_agg|map(v => v.cost)|json_encode|raw }},
+            backgroundColor: ['#6366f1','#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#a855f7']
+        }]
+    },
+    options: { plugins: { legend: { labels: { color: '#e4e6f0' }, position: 'bottom' } } }
+});
+{% endif %}
+
+// Status chart
+new Chart(document.getElementById('chartStatus'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Success', 'Error'],
+        datasets: [{
+            data: [{{ summary.requests - summary.errors }}, {{ summary.errors }}],
+            backgroundColor: ['#22c55e', '#ef4444']
+        }]
+    },
+    options: { plugins: { legend: { labels: { color: '#e4e6f0' }, position: 'bottom' } } }
+});
+</script>
+{% endif %}
+{% endblock %}

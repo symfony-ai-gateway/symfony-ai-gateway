@@ -69,13 +69,27 @@ final class Gateway implements GatewayInterface
     {
         $startTime = microtime(true);
 
-        if (null !== $context && null !== $this->authEnforcer) {
-            $this->authEnforcer->checkModelAllowed($context, $request->model);
-            $this->authEnforcer->checkBudget($context);
-            $this->authEnforcer->checkRateLimit($context);
-        }
+        // Wrap auth/rate-limit checks to log blocked requests for analytics
+        try {
+            if (null !== $context && null !== $this->authEnforcer) {
+                $this->authEnforcer->checkModelAllowed($context, $request->model);
+                $this->authEnforcer->checkBudget($context);
+                $this->authEnforcer->checkRateLimit($context);
+            }
 
-        $this->rateLimiter?->check(['global' => 'global', 'model' => $request->model]);
+            $this->rateLimiter?->check(['global' => 'global', 'model' => $request->model]);
+        } catch (\Throwable $e) {
+            $this->requestLogStore?->logBlockedRequest(
+                modelAlias: $request->model,
+                provider: 'unknown',
+                statusCode: 429,
+                error: $e->getMessage(),
+                keyId: $context?->apiKey->id,
+                keyName: $context?->apiKey->name,
+                teamId: $context?->apiKey->teamId,
+            );
+            throw $e;
+        }
 
         $cached = $this->cacheManager?->lookup($request);
         if (null !== $cached) {

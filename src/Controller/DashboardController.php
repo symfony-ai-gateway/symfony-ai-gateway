@@ -21,6 +21,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
+use function strtotime;
 use function time;
 
 use Twig\Environment;
@@ -387,7 +388,7 @@ final class DashboardController
         $keyStats = $this->requestLogStore?->getKeyStats($id) ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
         $modelBreakdown = $this->requestLogStore?->getKeyModelBreakdown($id) ?? [];
         $recentLogs = $this->requestLogStore?->getKeyLogs($id, 20) ?? [];
-        $keyDailyUsage = $this->requestLogStore?->getDailyUsage(30) ?? [];
+        $keyDailyUsage = $this->requestLogStore?->getKeyDailyUsage($id, 30) ?? [];
 
         // Get team-relative stats
         $teamStats = null !== $key->teamId ? ($this->requestLogStore?->getTeamStats($key->teamId) ?? null) : null;
@@ -594,7 +595,7 @@ final class DashboardController
 
         $teamStats = $this->requestLogStore?->getTeamStats($id) ?? ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0];
         $memberUsage = $this->requestLogStore?->getTeamMemberUsage($id) ?? [];
-        $teamDailyUsage = $this->requestLogStore?->getDailyUsage(30) ?? [];
+        $teamDailyUsage = $this->requestLogStore?->getTeamDailyUsage($id, 30) ?? [];
         $teamLogs = $this->requestLogStore?->getTeamLogs($id, 5000) ?? [];
 
         // Build model breakdown for this team from raw logs
@@ -671,6 +672,90 @@ final class DashboardController
             'teams' => $allTeams,
             'model_aliases' => $modelAliases,
             'action' => 'edit',
+        ])));
+    }
+
+    #[Route('/dashboard/requests', name: 'ai_gateway_dashboard_requests', methods: ['GET'])]
+    public function requests(Request $request): Response
+    {
+        $filters = [];
+
+        $keyName = $request->query->get('key_name', '');
+        $teamName = $request->query->get('team_name', '');
+        $provider = $request->query->get('provider', '');
+        $modelAlias = $request->query->get('model_alias', '');
+        $status = $request->query->get('status', '');
+        $errorFilter = $request->query->get('error', '');
+        $dateFrom = $request->query->get('date_from', '');
+        $dateTo = $request->query->get('date_to', '');
+        $page = max(1, (int) $request->query->get('page', '1'));
+        $perPage = 50;
+
+        if ('' !== $keyName) {
+            $filters['key_name'] = $keyName;
+        }
+        if ('' !== $teamName) {
+            $filters['team_name'] = $teamName;
+        }
+        if ('' !== $provider) {
+            $filters['provider'] = $provider;
+        }
+        if ('' !== $modelAlias) {
+            $filters['model_alias'] = $modelAlias;
+        }
+        if ('' !== $status) {
+            if ('error' === $status) {
+                $filters['status_code_min'] = 400;
+            } elseif ('success' === $status) {
+                $filters['status_code_max'] = 399;
+            }
+        }
+        if ('' !== $errorFilter) {
+            $filters['error'] = $errorFilter;
+        }
+        if ('' !== $dateFrom) {
+            $filters['date_from'] = strtotime($dateFrom) ?: null;
+        }
+        if ('' !== $dateTo) {
+            $filters['date_to'] = strtotime($dateTo) ?: null;
+        }
+
+        $result = $this->requestLogStore?->searchRequests($filters, $perPage, ($page - 1) * $perPage)
+            ?? ['rows' => [], 'total' => 0, 'summary' => ['requests' => 0, 'tokens' => 0, 'cost' => 0.0, 'errors' => 0]];
+
+        $totalPages = max(1, (int) ceil($result['total'] / $perPage));
+
+        // Get provider/model lists for filter dropdowns
+        $allProviders = $this->configStore?->listProviders() ?? [];
+        $allModels = $this->configStore?->listModels() ?? [];
+
+        $summary = $result['summary'];
+        // Top models from filtered results for chart
+        $filteredModelAgg = [];
+        foreach ($result['rows'] as $r) {
+            $m = $r['model_alias'];
+            $filteredModelAgg[$m] ??= ['requests' => 0, 'cost' => 0.0];
+            ++$filteredModelAgg[$m]['requests'];
+            $filteredModelAgg[$m]['cost'] += (float) $r['cost_usd'];
+        }
+
+        return new Response($this->twig->render('@AIGateway/dashboard/requests.html.twig', $this->params($request, [
+            'rows' => $result['rows'],
+            'total' => $result['total'],
+            'total_pages' => $totalPages,
+            'page' => $page,
+            'summary' => $summary,
+            'filtered_model_agg' => $filteredModelAgg,
+            'filter_key_name' => $keyName,
+            'filter_team_name' => $teamName,
+            'filter_provider' => $provider,
+            'filter_model_alias' => $modelAlias,
+            'filter_status' => $status,
+            'filter_error' => $errorFilter,
+            'filter_date_from' => $dateFrom,
+            'filter_date_to' => $dateTo,
+            'all_providers' => $allProviders,
+            'all_models' => $allModels,
         ])));
     }
 

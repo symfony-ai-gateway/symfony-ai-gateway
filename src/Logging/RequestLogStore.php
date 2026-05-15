@@ -338,6 +338,166 @@ final class RequestLogStore
         );
     }
 
+    // ── Filtered daily usage (fix: was using global data) ────────────────────
+
+    /**
+     * @return list<array{date: string, requests: int, tokens: int, cost: float}>
+     */
+    public function getKeyDailyUsage(string $keyId, int $days = 30): array
+    {
+        $since = time() - ($days * 86400);
+
+        return $this->connection->fetchAllAssociative(
+            "SELECT date(created_at, 'unixepoch') as date, COUNT(*) as requests, SUM(total_tokens) as tokens, SUM(cost_usd) as cost
+             FROM gateway_request_log WHERE key_id = ? AND created_at >= ? GROUP BY date ORDER BY date ASC",
+            [$keyId, $since],
+        );
+    }
+
+    /**
+     * @return list<array{date: string, requests: int, tokens: int, cost: float}>
+     */
+    public function getTeamDailyUsage(string $teamId, int $days = 30): array
+    {
+        $since = time() - ($days * 86400);
+
+        return $this->connection->fetchAllAssociative(
+            "SELECT date(created_at, 'unixepoch') as date, COUNT(*) as requests, SUM(total_tokens) as tokens, SUM(cost_usd) as cost
+             FROM gateway_request_log WHERE team_id = ? AND created_at >= ? GROUP BY date ORDER BY date ASC",
+            [$teamId, $since],
+        );
+    }
+
+    // ── Log blocked requests (rate-limit, budget, auth) ──────────────────────
+
+    /**
+     * Log a request that was blocked by rate-limit, budget, or auth enforcer.
+     * Stores only analytics metadata — NO request/response content.
+     */
+    public function logBlockedRequest(
+        string $modelAlias,
+        string $provider,
+        int $statusCode,
+        string $error,
+        string|null $keyId = null,
+        string|null $keyName = null,
+        string|null $teamId = null,
+        string|null $teamName = null,
+    ): void {
+        $this->insert(
+            log: new RequestLog(
+                id: bin2hex(random_bytes(8)),
+                model: $modelAlias,
+                provider: $provider,
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                costUsd: 0.0,
+                durationMs: 0.0,
+                cached: false,
+                statusCode: $statusCode,
+                error: $error,
+            ),
+            keyId: $keyId,
+            keyName: $keyName,
+            teamId: $teamId,
+            teamName: $teamName,
+        );
+    }
+
+    // ── Flexible request search ──────────────────────────────────────────────
+
+    /**
+     * Search requests with flexible filters. No request/response content stored.
+     *
+     * @param array{key_id?: string, key_name?: string, team_id?: string, team_name?: string, provider?: string, model_alias?: string, status_code_min?: int, status_code_max?: int, date_from?: int, date_to?: int, error?: string} $filters
+     *
+     * @return array{rows: list<array<string, mixed>>, total: int, summary: array{requests: int, tokens: int, cost: float, errors: int}}
+     */
+    public function searchRequests(array $filters = [], int $limit = 50, int $offset = 0): array
+    {
+        $where = '1 = 1';
+        $params = [];
+
+        if (!empty($filters['key_id'])) {
+            $where .= ' AND key_id = ?';
+            $params[] = $filters['key_id'];
+        }
+        if (!empty($filters['key_name'])) {
+            $where .= ' AND key_name LIKE ?';
+            $params[] = '%'.$filters['key_name'].'%';
+        }
+        if (!empty($filters['team_id'])) {
+            $where .= ' AND team_id = ?';
+            $params[] = $filters['team_id'];
+        }
+        if (!empty($filters['team_name'])) {
+            $where .= ' AND team_name LIKE ?';
+            $params[] = '%'.$filters['team_name'].'%';
+        }
+        if (!empty($filters['provider'])) {
+            $where .= ' AND provider = ?';
+            $params[] = $filters['provider'];
+        }
+        if (!empty($filters['model_alias'])) {
+            $where .= ' AND model_alias = ?';
+            $params[] = $filters['model_alias'];
+        }
+        if (!empty($filters['status_code_min'])) {
+            $where .= ' AND status_code >= ?';
+            $params[] = $filters['status_code_min'];
+        }
+        if (!empty($filters['status_code_max'])) {
+            $where .= ' AND status_code <= ?';
+            $params[] = $filters['status_code_max'];
+        }
+        if (!empty($filters['date_from'])) {
+            $where .= ' AND created_at >= ?';
+            $params[] = $filters['date_from'];
+        }
+        if (!empty($filters['date_to'])) {
+            $where .= ' AND created_at <= ?';
+            $params[] = $filters['date_to'];
+        }
+        if (isset($filters['error'])) {
+            if ('' === $filters['error']) {
+                $where .= ' AND (error IS NULL OR error = ?)';
+                $params[] = '';
+            } else {
+                $where .= ' AND error LIKE ?';
+                $params[] = '%'.$filters['error'].'%';
+            }
+        }
+
+        $total = (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM gateway_request_log WHERE {$where}",
+            $params,
+        );
+
+        $rows = $total > 0
+            ? $this->connection->fetchAllAssociative(
+                "SELECT * FROM gateway_request_log WHERE {$where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                [...$params, $limit, $offset],
+            )
+            : [];
+
+        $summary = $this->aggregateByWhere($where, $params);
+
+        return [
+            'rows' => $rows,
+            'total' => $total,
+            'summary' => $summary,
+        ];
+    }
+
+    /**
+     * @return array{requests: int, tokens: int, cost: float, errors: int}
+     */
+    private function aggregateByWhere(string $where, array $params): array
+    {
+        return $this->aggregate($where, $params);
+    }
+
     /**
      * @return array{requests: int, tokens: int, cost: float, errors: int}
      */

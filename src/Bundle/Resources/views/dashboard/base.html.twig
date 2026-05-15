@@ -66,6 +66,7 @@
         <a href="{{ dash.turl('/dashboard/models', dashboard_token|default('')) }}" class="{% if '/models' in app.request.pathInfo %}active{% endif %}">Models</a>
         <a href="{{ dash.turl('/dashboard/keys', dashboard_token|default('')) }}" class="{% if '/keys' in app.request.pathInfo %}active{% endif %}">API Keys</a>
         <a href="{{ dash.turl('/dashboard/teams', dashboard_token|default('')) }}" class="{% if '/teams' in app.request.pathInfo %}active{% endif %}">Teams</a>
+        <a href="{{ dash.turl('/dashboard/requests', dashboard_token|default('')) }}" class="{% if '/requests' in app.request.pathInfo %}active{% endif %}">Requests</a>
         <a href="{{ dash.turl('/dashboard/analytics', dashboard_token|default('')) }}" class="{% if '/analytics' in app.request.pathInfo %}active{% endif %}">Analytics</a>
         <a href="{{ dash.turl('/v1/health', dashboard_token|default('')) }}">Health API</a>
         <a href="{{ dash.turl('/v1/metrics', dashboard_token|default('')) }}">Metrics API</a>
