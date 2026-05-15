@@ -406,9 +406,84 @@ ai_gateway:
 
 > **Note:** `providers` and `models` are no longer configured in YAML. They are stored in the database and managed via the dashboard or CLI commands (`provider:create`, `model:create`, etc.).
 
-## Want a standalone server?
+## Standalone Server (Docker)
 
-If you just want to run AIGateway as a dedicated server without integrating it into an existing project, check out **[symfony-ai-gateway-standalone](https://github.com/symfony-ai-gateway/symfony-ai-gateway-standalone)** — a pre-configured Symfony project with Docker and ready-to-run config.
+Run AIGateway as a standalone server — no Symfony project needed. Uses **FrankenPHP** for high-concurrency request handling (Go runtime, worker mode, no cold starts).
+
+### Quick Start
+
+```bash
+# 1. Clone and configure
+git clone https://github.com/symfony-ai-gateway/symfony-ai-gateway.git
+cd symfony-ai-gateway
+cp .env.example .env
+# Edit .env and add at least one provider API key
+
+# 2. Start
+docker compose up -d
+
+# 3. Add a provider and model via the dashboard
+open http://localhost:8080/dashboard
+```
+
+### What's running
+
+- **FrankenPHP** inside an Alpine Docker container (PHP 8.3 + Go runtime)
+- **Worker mode**: Symfony kernel boots once, stays in memory
+- **SQLite** database stored in a persistent Docker volume (`gateway-data`)
+- Handles **hundreds of concurrent LLM proxy requests** (non-blocking I/O via Go)
+
+### Configure providers
+
+Via the dashboard at `http://localhost:8080/dashboard`, or via CLI inside the container:
+
+```bash
+docker compose exec ai-gateway php bin/console provider:create \
+    --name openai --format openai --api-key 'sk-...'
+
+docker compose exec ai-gateway php bin/console model:create \
+    --alias gpt_4o --provider openai --model gpt-4o \
+    --pricing-input 2.50 --pricing-output 10.00
+```
+
+### Use it
+
+```bash
+curl http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt_4o","messages":[{"role":"user","content":"Hello"}]}'
+```
+
+### Custom port
+
+```bash
+PORT=3000 docker compose up -d
+```
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8080` | Host port mapping |
+| `APP_ENV` | `prod` | Symfony environment |
+| `OPENAI_API_KEY` | | OpenAI API key |
+| `ANTHROPIC_API_KEY` | | Anthropic API key |
+| `GEMINI_API_KEY` | | Google Gemini API key |
+| `DEEPSEEK_API_KEY` | | DeepSeek API key |
+| `GROQ_API_KEY` | | Groq API key |
+| `OPENROUTER_API_KEY` | | OpenRouter API key |
+| `AZURE_API_KEY` | | Azure OpenAI API key |
+
+### Local dev (no Docker)
+
+```bash
+composer install
+cp .env.example .env
+php -S localhost:8080 public/index.dev.php
+```
+
+> Note: `php -S` handles only 1 request at a time. Use Docker/FrankenPHP for real workloads.
 
 ## Requirements
 

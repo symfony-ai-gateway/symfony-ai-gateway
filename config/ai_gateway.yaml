@@ -1,0 +1,11 @@
+ai_gateway:
+    dashboard:
+        tokenRequired: false
+
+    routes:
+        enabled: true
+        prefix: ''
+
+    providers: []
+
+    models: []
