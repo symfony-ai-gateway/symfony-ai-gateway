@@ -35,9 +35,7 @@ use function is_string;
 use function sprintf;
 
 use Symfony\AI\Platform\Bridge\Anthropic\Factory as AnthropicFactory;
-use Symfony\AI\Platform\Bridge\Gemini\Factory as GeminiFactory;
 use Symfony\AI\Platform\Bridge\Generic\Factory as GenericFactory;
-use Symfony\AI\Platform\Bridge\Ollama\Factory as OllamaFactory;
 use Symfony\AI\Platform\Bridge\OpenAi\Factory as OpenAiFactory;
 use Symfony\AI\Platform\Bridge\OpenAi\Gpt;
 use Symfony\AI\Platform\Bridge\OpenAi\ModelCatalog as OpenAiModelCatalog;

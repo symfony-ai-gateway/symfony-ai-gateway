@@ -11,15 +11,12 @@
         "ext-json": "*",
         "ext-mbstring": "*",
         "doctrine/dbal": "^4.4",
-        "runtime/frankenphp-symfony": "^0.2",
         "psr/event-dispatcher": "^1.0",
         "psr/log": "^3.0",
         "symfony/ai-anthropic-platform": "^0.8.1",
         "symfony/ai-bundle": "^0.8.0",
         "symfony/ai-chat": "^0.8.0",
-        "symfony/ai-gemini-platform": "^0.8.1",
         "symfony/ai-generic-platform": "^0.8.0",
-        "symfony/ai-ollama-platform": "^0.8.0",
         "symfony/ai-open-ai-platform": "^0.8.0",
         "symfony/ai-platform": "^0.8.1",
         "symfony/clock": "^7.4 || ^8.0",
@@ -79,7 +76,7 @@
         "sort-packages": true,
         "allow-plugins": false
     },
-    "keywords": ["ai", "llm", "gateway", "proxy", "openai", "anthropic", "ollama", "php", "symfony"],
+    "keywords": ["ai", "llm", "gateway", "proxy", "openai", "anthropic", "php", "symfony"],
     "authors": [
         {
             "name": "Mathieu BERNARD",
