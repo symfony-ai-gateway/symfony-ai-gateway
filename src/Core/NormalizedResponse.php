@@ -24,6 +24,7 @@ final readonly class NormalizedResponse
         public float $durationMs = 0.0,
         public bool $cacheHit = false,
         public float $costUsd = 0.0,
+        public string|null $deployment = null,
     ) {
     }
 

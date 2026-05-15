@@ -22,6 +22,8 @@ use AIGateway\Pipeline\RetryConfig;
 use AIGateway\Provider\ProviderAdapterInterface;
 use AIGateway\Provider\ProviderRequest;
 use AIGateway\Provider\ProviderResponse;
+use AIGateway\Router\Deployment;
+use AIGateway\Router\DeploymentRouter;
 use AIGateway\Provider\RuntimeProviderAdapterInterface;
 use AIGateway\Provider\StreamingProviderAdapterInterface;
 use AIGateway\RateLimit\MultiLevelRateLimiter;
@@ -34,6 +36,7 @@ use function sprintf;
 final class Gateway implements GatewayInterface
 {
     private LoggerInterface $logger;
+    private DeploymentRouter $deploymentRouter;
 
     /** @var array<string, ProviderAdapterInterface> */
     private array $dynamicProviders = [];
@@ -63,6 +66,7 @@ final class Gateway implements GatewayInterface
         private readonly RequestLogStore|null $requestLogStore = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
+        $this->deploymentRouter = new DeploymentRouter();
     }
 
     public function chat(NormalizedRequest $request, ApiKeyContext|null $context = null): NormalizedResponse
@@ -122,6 +126,9 @@ final class Gateway implements GatewayInterface
         if (str_starts_with($resolvedTarget, 'pipeline:')) {
             $pipelineName = substr($resolvedTarget, 9);
             $response = $this->executePipeline($request, $pipelineName);
+        } elseif (null !== $this->configStore && $deployments = $this->getActiveDeployments($requestedModel)) {
+            $response = $this->executeWithDeployments($request, $deployments);
+            $resolution = $this->tryResolveDynamic($requestedModel);
         } elseif ($this->modelRegistry->has($requestedModel)) {
             $resolution = $this->modelRegistry->resolve($requestedModel);
             $response = $this->executeSingle($request, $resolution);
@@ -265,6 +272,89 @@ final class Gateway implements GatewayInterface
         }
 
         return $adapter->translateResponse($providerResponse, $request->model);
+    }
+
+    /**
+     * @param list<Deployment> $deployments
+     */
+    private function executeWithDeployments(NormalizedRequest $request, array $deployments): NormalizedResponse
+    {
+        $strategy = $this->configStore?->getModelRoutingStrategy($request->model) ?? 'weighted';
+        $maxAttempts = count($deployments);
+        $lastException = null;
+
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $deployment = $this->deploymentRouter->pick($deployments, $strategy);
+
+            $this->deploymentRouter->incrementActive($deployment->providerName);
+
+            $depStart = microtime(true);
+
+            try {
+                $this->tryCreateDynamicProvider($deployment->providerName);
+
+                $depResolution = new ModelResolution(
+                    alias: $deployment->alias,
+                    provider: $deployment->providerName,
+                    model: $deployment->model,
+                    pricing: new ModelPricing($deployment->pricingInput, $deployment->pricingOutput),
+                );
+
+                $response = $this->executeSingle($request, $depResolution);
+
+                $response = new NormalizedResponse(
+                    id: $response->id,
+                    model: $response->model,
+                    provider: $response->provider,
+                    choices: $response->choices,
+                    usage: $response->usage,
+                    statusCode: $response->statusCode,
+                    systemFingerprint: $response->systemFingerprint,
+                    fallbackFrom: $response->fallbackFrom,
+                    durationMs: $response->durationMs,
+                    cacheHit: $response->cacheHit,
+                    costUsd: $response->costUsd,
+                    deployment: $deployment->providerName . '/' . $deployment->model,
+                );
+
+                $this->deploymentRouter->recordLatency($deployment->providerName, (microtime(true) - $depStart) * 1000);
+
+                return $response;
+            } catch (GatewayException $e) {
+                $this->deploymentRouter->decrementActive($deployment->providerName);
+
+                if ($e->getCode() >= 500 || 429 === $e->getCode()) {
+                    $this->deploymentRouter->cooldown($deployment->providerName, 429 === $e->getCode() ? 30 : 60);
+                    $deployments = array_values(array_filter($deployments, static fn (Deployment $d): bool => $d->id !== $deployment->id));
+                    $lastException = $e;
+                    continue;
+                }
+
+                throw $e;
+            } catch (\Throwable $e) {
+                $this->deploymentRouter->decrementActive($deployment->providerName);
+                $this->deploymentRouter->cooldown($deployment->providerName, 60);
+                $deployments = array_values(array_filter($deployments, static fn (Deployment $d): bool => $d->id !== $deployment->id));
+                $lastException = $e;
+                continue;
+            }
+        }
+
+        throw $lastException ?? GatewayException::providerError('all-deployments', 503, 'All deployments failed.');
+    }
+
+    /**
+     * @return list<Deployment>
+     */
+    private function getActiveDeployments(string $alias): array
+    {
+        $rows = $this->configStore?->getEnabledDeployments($alias) ?? [];
+
+        if ([] === $rows) {
+            return [];
+        }
+
+        return array_map(static fn (array $row): Deployment => Deployment::fromRow($row), $rows);
     }
 
     private function executePipeline(NormalizedRequest $request, string $pipelineName): NormalizedResponse

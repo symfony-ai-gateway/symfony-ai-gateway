@@ -262,6 +262,9 @@ final class DashboardController
         $keyBreakdown = $this->requestLogStore?->getModelKeyBreakdown($alias) ?? [];
         $dailyUsage = $this->requestLogStore?->getModelDailyUsage($alias, 60) ?? [];
         $recentLogs = $this->requestLogStore?->getModelLogs($alias, 20) ?? [];
+        $deployments = $this->configStore?->getDeployments($alias) ?? [];
+        $providers = $this->configStore?->listProviders() ?? [];
+        $routingStrategy = $this->configStore?->getModelRoutingStrategy($alias) ?? 'weighted';
 
         return new Response($this->twig->render('@AIGateway/dashboard/models_detail.html.twig', $this->params($request, [
             'model' => $model,
@@ -270,6 +273,9 @@ final class DashboardController
             'key_breakdown' => $keyBreakdown,
             'daily_usage' => $dailyUsage,
             'recent_logs' => $recentLogs,
+            'deployments' => $deployments,
+            'providers' => $providers,
+            'routing_strategy' => $routingStrategy,
         ])));
     }
 
@@ -279,6 +285,32 @@ final class DashboardController
         $this->configStore?->deleteModel($alias);
 
         return new RedirectResponse($this->url($request, '/dashboard/models'));
+    }
+
+    #[Route('/dashboard/models/{alias}/deployments/add', name: 'ai_gateway_dashboard_deployment_add', methods: ['POST'])]
+    public function deploymentAdd(Request $request, string $alias): Response
+    {
+        $providerName = (string) ($request->request->get('provider_name') ?? '');
+        $model = (string) ($request->request->get('model') ?? '');
+        $priority = (int) ($request->request->get('priority') ?? 1);
+        $weight = (int) ($request->request->get('weight') ?? 100);
+        $rpmLimit = $request->request->get('rpm_limit');
+        $rpmLimit = '' !== $rpmLimit ? (int) $rpmLimit : null;
+
+        if ('' !== $providerName && '' !== $model) {
+            $this->configStore?->addDeployment($alias, $providerName, $model, $priority, $weight, $rpmLimit);
+        }
+
+        return new RedirectResponse($this->url($request, '/dashboard/models/' . $alias));
+    }
+
+    #[Route('/dashboard/deployments/{id}/remove', name: 'ai_gateway_dashboard_deployment_remove', methods: ['POST'])]
+    public function deploymentRemove(Request $request, int $id): Response
+    {
+        $alias = (string) ($request->request->get('alias') ?? '');
+        $this->configStore?->removeDeployment($id);
+
+        return new RedirectResponse($this->url($request, '/dashboard/models/' . $alias));
     }
 
     #[Route('/dashboard/keys', name: 'ai_gateway_dashboard_keys', methods: ['GET'])]

@@ -36,6 +36,62 @@
     </dl>
 </div>
 
+{# ── Deployments (Load Balancing) ── #}
+{% set deps = deployments|default([]) %}
+{% set provs = providers|default([]) %}
+<div class="section">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2>Deployments ({{ deps|length }})</h2>
+        <select id="routing-strategy" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px">
+            {% for s in ['weighted', 'round-robin', 'least-busy', 'cost-based', 'latency-based'] %}
+            <option value="{{ s }}" {{ s == routing_strategy|default('weighted') ? 'selected' }}>{{ s }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% if deps|length > 0 %}
+    <div class="card" style="padding:0;overflow:hidden">
+        <table>
+            <thead><tr><th>Provider</th><th>Model</th><th>Priority</th><th>Weight</th><th>RPM Limit</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            {% for d in deps %}
+            <tr>
+                <td><a href="{{ dash.turl('/dashboard/providers/' ~ d.provider_name, dashboard_token|default('')) }}">{{ d.provider_name }}</a></td>
+                <td class="mono">{{ d.model }}</td>
+                <td>{{ d.priority }}</td>
+                <td>{{ d.weight }}</td>
+                <td>{{ d.rpm_limit ? d.rpm_limit|number_format : '—' }}</td>
+                <td>{{ d.enabled ? '<span class="badge badge-green">active</span>' : '<span class="badge badge-red">disabled</span>' }}</td>
+                <td>
+                    <form method="POST" action="{{ dash.turl('/dashboard/deployments/' ~ d.id ~ '/remove', dashboard_token|default('')) }}" style="display:inline">
+                        <input type="hidden" name="alias" value="{{ model.alias }}">
+                        <button type="submit" class="btn" style="background:var(--surface2);color:#f87171;padding:2px 10px;font-size:12px" onclick="return confirm('Remove this deployment?')">Remove</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {# Add deployment form ── #}
+    {% if provs|length > 0 %}
+    <div class="card" style="margin-top:12px">
+        <h3 style="margin-bottom:8px">Add Deployment</h3>
+        <form method="POST" action="{{ dash.turl('/dashboard/models/' ~ model.alias ~ '/deployments/add', dashboard_token|default('')) }}" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+            <div><label style="font-size:12px;color:var(--text2)">Provider</label><select name="provider_name" required style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px">
+                {% for p in provs %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}
+            </select></div>
+            <div><label style="font-size:12px;color:var(--text2)">Model ID</label><input name="model" required placeholder="gpt-4o" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;width:160px"></div>
+            <div><label style="font-size:12px;color:var(--text2)">Priority</label><input name="priority" type="number" value="1" min="1" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;width:70px"></div>
+            <div><label style="font-size:12px;color:var(--text2)">Weight</label><input name="weight" type="number" value="100" min="1" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;width:70px"></div>
+            <div><label style="font-size:12px;color:var(--text2)">RPM Limit</label><input name="rpm_limit" type="number" placeholder="none" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;width:80px"></div>
+            <button type="submit" class="btn btn-primary" style="padding:6px 16px;font-size:13px">Add</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
 {# ── 3. Daily chart ── #}
 {% set du = daily_usage|default([]) %}
 {% if du|length > 0 %}

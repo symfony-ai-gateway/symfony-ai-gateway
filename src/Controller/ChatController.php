@@ -55,7 +55,13 @@ final class ChatController
 
         $response = $this->gateway->chat($normalized, $context);
 
-        return new JsonResponse($response->toArray(), $response->statusCode);
+        $json = new JsonResponse($response->toArray(), $response->statusCode);
+
+        if (null !== $response->deployment) {
+            $json->headers->set('X-Deployment', $response->deployment);
+        }
+
+        return $json;
     }
 
     #[Route('/v1/models', name: 'ai_gateway_models', methods: ['GET'])]

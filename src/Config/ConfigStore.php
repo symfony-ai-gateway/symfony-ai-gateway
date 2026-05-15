@@ -46,8 +46,27 @@ final class ConfigStore
                     model VARCHAR(200) NOT NULL,
                     pricing_input REAL NOT NULL DEFAULT 0.0,
                     pricing_output REAL NOT NULL DEFAULT 0.0,
+                    routing_strategy VARCHAR(20) NOT NULL DEFAULT \'weighted\',
                     enabled BOOLEAN NOT NULL DEFAULT 1,
                     created_at INTEGER NOT NULL,
+                    FOREIGN KEY (provider_name) REFERENCES gateway_providers(name)
+                )
+            ');
+        }
+
+        if (!in_array('gateway_model_deployments', $tables, true)) {
+            $this->connection->executeStatement('
+                CREATE TABLE gateway_model_deployments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    alias VARCHAR(100) NOT NULL,
+                    provider_name VARCHAR(100) NOT NULL,
+                    model VARCHAR(200) NOT NULL,
+                    priority INTEGER NOT NULL DEFAULT 1,
+                    weight INTEGER NOT NULL DEFAULT 100,
+                    rpm_limit INTEGER DEFAULT NULL,
+                    enabled BOOLEAN NOT NULL DEFAULT 1,
+                    created_at INTEGER NOT NULL,
+                    FOREIGN KEY (alias) REFERENCES gateway_models(alias),
                     FOREIGN KEY (provider_name) REFERENCES gateway_providers(name)
                 )
             ');
@@ -205,12 +224,89 @@ final class ConfigStore
 
     public function deleteModel(string $alias): void
     {
+        $this->connection->delete('gateway_model_deployments', ['alias' => $alias]);
         $this->connection->delete('gateway_models', ['alias' => $alias]);
     }
 
     public function toggleModel(string $alias, bool $enabled): void
     {
         $this->connection->update('gateway_models', ['enabled' => $enabled ? 1 : 0], ['alias' => $alias]);
+    }
+
+    public function getModelRoutingStrategy(string $alias): string
+    {
+        $row = $this->connection->fetchAssociative(
+            'SELECT routing_strategy FROM gateway_models WHERE alias = ?',
+            [$alias]
+        );
+
+        return false !== $row ? (string) $row['routing_strategy'] : 'weighted';
+    }
+
+    public function setModelRoutingStrategy(string $alias, string $strategy): void
+    {
+        $this->connection->update('gateway_models', ['routing_strategy' => $strategy], ['alias' => $alias]);
+    }
+
+    // ── Deployments ──
+
+    /**
+     * @return list<array{id: int, alias: string, provider_name: string, model: string, priority: int, weight: int, rpm_limit: int|null, enabled: bool}>
+     */
+    public function getDeployments(string $alias): array
+    {
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT id, alias, provider_name, model, priority, weight, rpm_limit, enabled FROM gateway_model_deployments WHERE alias = ? ORDER BY priority ASC, weight DESC',
+            [$alias]
+        );
+
+        return array_values(array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'alias' => (string) $row['alias'],
+            'provider_name' => (string) $row['provider_name'],
+            'model' => (string) $row['model'],
+            'priority' => (int) $row['priority'],
+            'weight' => (int) $row['weight'],
+            'rpm_limit' => null !== $row['rpm_limit'] ? (int) $row['rpm_limit'] : null,
+            'enabled' => (bool) $row['enabled'],
+        ], $rows));
+    }
+
+    /**
+     * @return list<array{id: int, alias: string, provider_name: string, model: string, priority: int, weight: int, rpm_limit: int|null, enabled: bool}>
+     */
+    public function getEnabledDeployments(string $alias): array
+    {
+        return array_values(array_filter(
+            $this->getDeployments($alias),
+            static fn (array $d): bool => $d['enabled'],
+        ));
+    }
+
+    public function addDeployment(string $alias, string $providerName, string $model, int $priority = 1, int $weight = 100, int|null $rpmLimit = null): int
+    {
+        $this->connection->insert('gateway_model_deployments', [
+            'alias' => $alias,
+            'provider_name' => $providerName,
+            'model' => $model,
+            'priority' => $priority,
+            'weight' => $weight,
+            'rpm_limit' => $rpmLimit,
+            'enabled' => 1,
+            'created_at' => time(),
+        ]);
+
+        return (int) $this->connection->lastInsertId();
+    }
+
+    public function removeDeployment(int $id): void
+    {
+        $this->connection->delete('gateway_model_deployments', ['id' => $id]);
+    }
+
+    public function toggleDeployment(int $id, bool $enabled): void
+    {
+        $this->connection->update('gateway_model_deployments', ['enabled' => $enabled ? 1 : 0], ['id' => $id]);
     }
 
     /**
