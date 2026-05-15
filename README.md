@@ -13,7 +13,8 @@ Every project that calls LLMs reinvents the same plumbing: provider SDKs, API ke
 ## What it does
 
 - **Unified API** — Expose `/v1/chat/completions`, `/v1/models`, `/v1/health` in your Symfony app
-- **Multi-provider** — OpenAI, Anthropic, Gemini, Ollama, Azure, any OpenAI-compatible endpoint
+- **Multi-provider** — Two formats cover everything: `openai` (any OpenAI-compatible endpoint) and `anthropic`
+- **Load balancing** — Route requests across multiple deployments with weighted, round-robin, least-busy, cost-based, or latency-based strategies
 - **Per-key auth** — Hierarchical teams with restrictive rule inheritance
 - **Budget enforcement** — Daily/monthly per-key budget limits in USD
 - **Rate limiting** — Sliding window per key
@@ -25,6 +26,29 @@ Every project that calls LLMs reinvents the same plumbing: provider SDKs, API ke
 - **Web dashboard** — Dark-themed UI at `/dashboard` with Chart.js analytics
 - **CLI management** — Full provider, model, key, and team management from the command line
 - **Route prefix** — Optional `routes.prefix` to mount under `/ai-gateway/` or any prefix
+
+## Supported Providers
+
+Two formats, 100+ providers:
+
+| Format | Providers |
+|---|---|
+| **`openai`** | OpenAI, DeepSeek, Google Gemini, Groq, OpenRouter, Mistral, Together AI, AWS Bedrock, Azure OpenAI, Cohere, Fireworks, Perplexity, Ollama, vLLM, HuggingFace TGI, any OpenAI-compatible endpoint |
+| **`anthropic`** | Anthropic (Claude) |
+
+Just set `format: openai` and point `base_url` to the provider. Examples:
+
+| Provider | format | base_url |
+|---|---|---|
+| OpenAI | `openai` | _(default)_ |
+| DeepSeek | `openai` | `https://api.deepseek.com` |
+| Google Gemini | `openai` | `https://generativelanguage.googleapis.com/v1beta/openai/` |
+| Groq | `openai` | `https://api.groq.com/openai/v1` |
+| OpenRouter | `openai` | `https://openrouter.ai/api/v1` |
+| AWS Bedrock | `openai` | `https://bedrock-mantle.us-east-1.api.aws/v1` |
+| Mistral | `openai` | `https://api.mistral.ai/v1` |
+| Ollama (local) | `openai` | `http://localhost:11434/v1` |
+| Anthropic | `anthropic` | _(default)_ |
 
 ## Install
 

@@ -193,33 +193,7 @@ final class AIGatewayExtension extends ConfigurableExtension implements PrependE
                     '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                     '$name' => $providerName,
                 ]),
-            'gemini' => $definition
-                ->setFactory([GeminiFactory::class, 'createPlatform'])
-                ->setArguments([
-                    '$apiKey' => $apiKey,
-                    '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
-                    '$name' => $providerName,
-                ]),
-            'ollama' => $definition
-                ->setFactory([OllamaFactory::class, 'createPlatform'])
-                ->setArguments([
-                    '$endpoint' => $baseUrl ?? 'http://localhost:11434',
-                    '$apiKey' => '' !== $apiKey ? $apiKey : null,
-                    '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
-                    '$name' => $providerName,
-                ]),
-            'azure' => $definition
-                ->setFactory([GenericFactory::class, 'createPlatform'])
-                ->setArguments([
-                    '$baseUrl' => $baseUrl ?? 'https://YOUR_RESOURCE.openai.azure.com',
-                    '$apiKey' => $apiKey,
-                    '$httpClient' => new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE),
-                    '$supportsCompletions' => true,
-                    '$supportsEmbeddings' => false,
-                    '$completionsPath' => $providerConfig['completions_path'] ?? '/openai/deployments/gpt-4/chat/completions?api-version=2024-02-15-preview',
-                    '$name' => $providerName,
-                ]),
-            default => throw new InvalidConfigurationException(sprintf('Unknown provider format "%s".', $format)),
+            default => throw new InvalidConfigurationException(sprintf('Unknown provider format "%s". Supported formats: openai, anthropic.', $format)),
         };
     }
 

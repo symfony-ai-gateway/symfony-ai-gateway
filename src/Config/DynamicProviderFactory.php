@@ -7,9 +7,7 @@ namespace AIGateway\Config;
 use AIGateway\Provider\ProviderCapabilities;
 use AIGateway\Provider\SymfonyAi\SymfonyAiProviderAdapter;
 use Symfony\AI\Platform\Bridge\Anthropic\Factory as AnthropicFactory;
-use Symfony\AI\Platform\Bridge\Gemini\Factory as GeminiFactory;
 use Symfony\AI\Platform\Bridge\Generic\Factory as GenericFactory;
-use Symfony\AI\Platform\Bridge\Ollama\Factory as OllamaFactory;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final class DynamicProviderFactory
@@ -34,26 +32,6 @@ final class DynamicProviderFactory
             'anthropic' => AnthropicFactory::createPlatform(
                 apiKey: $apiKey,
                 httpClient: $this->httpClient,
-                name: $name,
-            ),
-            'gemini' => GeminiFactory::createPlatform(
-                apiKey: $apiKey,
-                httpClient: $this->httpClient,
-                name: $name,
-            ),
-            'ollama' => OllamaFactory::createPlatform(
-                endpoint: $baseUrl ?? 'http://localhost:11434',
-                apiKey: '' !== $apiKey ? $apiKey : null,
-                httpClient: $this->httpClient,
-                name: $name,
-            ),
-            'azure' => GenericFactory::createPlatform(
-                baseUrl: $baseUrl ?? 'https://YOUR_RESOURCE.openai.azure.com',
-                apiKey: $apiKey,
-                httpClient: $this->httpClient,
-                supportsCompletions: true,
-                supportsEmbeddings: false,
-                completionsPath: $completionsPath,
                 name: $name,
             ),
             default => GenericFactory::createPlatform(
